@@ -1,0 +1,22 @@
+{
+    "name": "Инженеры будущего",
+    "font_name": "Times New Roman",
+    "font_size_pt": 14,
+    "line_spacing": 1.5,
+    "first_line_indent_cm": 1.25,
+    "margin_top_cm": 2,
+    "margin_bottom_cm": 2,
+    "margin_left_cm": 2,
+    "margin_right_cm": 2,
+    "document_type": "research",
+    "structure": {
+        "label": "Исследовательская работа",
+        "title_page": true,
+        "toc": true,
+        "sections": [
+            "введение",
+            "заключение",
+            "список литературы"
+        ]
+    }
+}

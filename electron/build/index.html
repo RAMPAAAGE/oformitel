@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Оформитель документов</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main>
+    <h1>Оформитель документов</h1>
+    <p class="intro">
+      Приведение работы к требованиям конференции: оформление документа,
+      создание титульного листа и проверка презентации.
+    </p>
+
+    <nav class="tabs">
+      <button type="button" class="tab-button" data-tab="document">Документ</button>
+      <button type="button" class="tab-button" data-tab="title_page">Титульный лист</button>
+      <button type="button" class="tab-button" data-tab="presentation">Презентация</button>
+    </nav>
+
+    <section class="tab-page" data-tab="document">
+
+      {% if message %}
+        <p class="notice success">{{ message }}</p>
+      {% endif %}
+
+      {% if error %}
+        <p class="notice error">{{ error }}</p>
+      {% endif %}
+
+      <div id="doc-result"></div>
+
+      <section class="card">
+        <h2>Оформить документ</h2>
+        <form id="doc-form" action="{{ url_for('apply_profile') }}" method="post" enctype="multipart/form-data">
+          <label for="document">Документ Word</label>
+          <input id="document" name="document" type="file" accept=".docx" required>
+
+          <label for="profile_file">Профиль оформления</label>
+          <select id="profile_file" name="profile_file" required>
+            {% for profile in profiles %}
+              <option value="{{ profile.file }}">{{ profile.name }}</option>
+            {% else %}
+              <option value="">Нет доступных профилей</option>
+            {% endfor %}
+          </select>
+
+          <label for="title_file">Титульный лист (вставить в начало документа)</label>
+          <select id="title_file" name="title_file">
+            <option value="">Не вставлять</option>
+            {% for title_page in title_pages %}
+              <option value="{{ title_page.file }}">{{ title_page.label }}</option>
+            {% endfor %}
+          </select>
+          <p class="hint" id="title-hint"{% if title_pages %} style="display: none"{% endif %}>Чтобы вставить титульный лист, сначала создайте его на вкладке «Титульный лист».</p>
+
+          <button type="submit">Проверить и оформить</button>
+          <button type="button" class="gray" id="clear-button">Очистить</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <details>
+          <summary>Создать свой профиль</summary>
+          <p class="hint">Все размеры полей и отступа указываются в сантиметрах.</p>
+
+          <form action="{{ url_for('new_profile') }}" method="post">
+            <div class="grid">
+              <div>
+                <label for="name">Название профиля</label>
+                <input id="name" name="name" type="text" placeholder="Например, Реферат" required>
+              </div>
+              <div>
+                <label for="font_name">Шрифт</label>
+                <input id="font_name" name="font_name" type="text" value="Times New Roman" required>
+              </div>
+              <div>
+                <label for="document_type">Тип документа</label>
+                <select id="document_type" name="document_type">
+                  {% for key, document_type in document_types.items() %}
+                    <option value="{{ key }}"{% if key == "free" %} selected{% endif %}>{{ document_type.label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div>
+                <label for="font_size_pt">Размер шрифта, пт</label>
+                <input id="font_size_pt" name="font_size_pt" type="number" min="1" value="14" required>
+              </div>
+              <div>
+                <label for="line_spacing">Межстрочный интервал</label>
+                <input id="line_spacing" name="line_spacing" type="number" min="0.1" step="0.1" value="1.5" required>
+              </div>
+              <div>
+                <label for="first_line_indent_cm">Отступ первой строки, см</label>
+                <input id="first_line_indent_cm" name="first_line_indent_cm" type="number" min="0" step="0.01" value="1.25" required>
+              </div>
+              <div>
+                <label for="margin_top_cm">Верхнее поле, см</label>
+                <input id="margin_top_cm" name="margin_top_cm" type="number" min="0" step="0.1" value="2" required>
+              </div>
+              <div>
+                <label for="margin_bottom_cm">Нижнее поле, см</label>
+                <input id="margin_bottom_cm" name="margin_bottom_cm" type="number" min="0" step="0.1" value="2" required>
+              </div>
+              <div>
+                <label for="margin_left_cm">Левое поле, см</label>
+                <input id="margin_left_cm" name="margin_left_cm" type="number" min="0" step="0.1" value="3" required>
+              </div>
+              <div>
+                <label for="margin_right_cm">Правое поле, см</label>
+                <input id="margin_right_cm" name="margin_right_cm" type="number" min="0" step="0.1" value="1" required>
+              </div>
+            </div>
+            <p class="hint profile-note">Тип документа добавляет только проверку структуры: приложение предупредит о недостающих разделах, но не будет писать их за вас.</p>
+            <button type="submit">Сохранить профиль</button>
+          </form>
+        </details>
+      </section>
+    </section>
+
+    <section class="tab-page" data-tab="title_page">
+      <div id="title-result"></div>
+
+      <section class="card">
+        <h2>Создать титульный лист</h2>
+        <form id="title-form" action="{{ url_for('create_title_page') }}" method="post">
+          <label for="organization">Полное название образовательной организации</label>
+          <input id="organization" name="organization" type="text" placeholder="Например, МБОУ СОШ №1" required>
+
+          <label for="work_title">Название работы</label>
+          <input id="work_title" name="work_title" type="text" placeholder="Например, Влияние музыки на память" required>
+
+          <label for="participants">Участник(и): класс, фамилия, имя, отчество</label>
+          <input id="participants" name="participants" type="text" placeholder="10 класс, Иванов Иван Иванович" required>
+
+          <label for="supervisor">Руководитель: должность, место работы, фамилия, имя, отчество</label>
+          <input id="supervisor" name="supervisor" type="text" placeholder="учитель биологии, Петрова Мария Сергеевна" required>
+
+          <div class="grid">
+            <div>
+              <label for="city">Город</label>
+              <input id="city" name="city" type="text" placeholder="Москва" required>
+            </div>
+            <div>
+              <label for="year">Год</label>
+              <input id="year" name="year" type="text" placeholder="2026" required>
+            </div>
+          </div>
+
+          <button type="submit">Создать титульный лист</button>
+        </form>
+      </section>
+    </section>
+
+    <section class="tab-page" data-tab="presentation">
+      <div id="pptx-result"></div>
+
+      <section class="card">
+        <h2>Проверить презентацию</h2>
+        <form id="pptx-form" action="{{ url_for('analyze_pptx') }}" method="post" enctype="multipart/form-data">
+          <label for="presentation">Файл презентации</label>
+          <input id="presentation" name="presentation" type="file" accept=".pptx" required>
+
+          <button type="submit">Проверить презентацию</button>
+        </form>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    function showTab(tabName) {
+      var buttons = document.querySelectorAll(".tab-button");
+      for (var i = 0; i < buttons.length; i++) {
+        var b = buttons[i];
+        if (b.getAttribute("data-tab") === tabName) {
+          b.classList.add("active");
+        } else {
+          b.classList.remove("active");
+        }
+      }
+      var pages = document.querySelectorAll(".tab-page");
+      for (var j = 0; j < pages.length; j++) {
+        var p = pages[j];
+        if (p.getAttribute("data-tab") === tabName) {
+          p.classList.add("active");
+        } else {
+          p.classList.remove("active");
+        }
+      }
+    }
+
+    var tabButtons = document.querySelectorAll(".tab-button");
+    for (var i = 0; i < tabButtons.length; i++) {
+      tabButtons[i].addEventListener("click", function () {
+        showTab(this.getAttribute("data-tab"));
+      });
+    }
+
+    showTab("{{ active_tab }}");
+
+
+
+    function make(tag, text, className) {
+      var item = document.createElement(tag);
+      if (text) {
+        item.textContent = text;
+      }
+      if (className) {
+        item.className = className;
+      }
+      return item;
+    }
+
+    function notice(box, text, kind) {
+      box.appendChild(make("p", text, "notice " + kind));
+    }
+
+    function downloadLink(url, text) {
+      var link = make("a", text);
+      link.href = url;
+      link.setAttribute("download", "");
+      return link;
+    }
+
+    function sendForm(form, done, extra) {
+      var button = form.querySelector("button[type=submit]");
+      var oldText = button.textContent;
+      button.disabled = true;
+      button.textContent = "Подождите...";
+
+      var body = new FormData(form);
+      for (var key in extra || {}) {
+        body.append(key, extra[key]);
+      }
+      fetch(form.action, { method: "POST", body: body })
+        .then(function (response) { return response.json(); })
+        .then(function (data) { done(data); })
+        .catch(function () { done({ error: "Не удалось связаться с программой. Попробуйте ещё раз." }); })
+        .then(function () {
+          button.disabled = false;
+          button.textContent = oldText;
+        });
+    }
+
+
+
+    var docForm = document.getElementById("doc-form");
+    var docResult = document.getElementById("doc-result");
+
+    function showChanges(box, changes, total) {
+      var details = make("details", "", "criteria-list");
+      details.appendChild(make("summary", "Исправлено в тексте: " + total + " (показать список)"));
+      box.appendChild(details);
+      var table = make("table", "", "changes");
+      var head = make("tr");
+      head.appendChild(make("th", "Было"));
+      head.appendChild(make("th", "Стало"));
+      table.appendChild(head);
+      for (var i = 0; i < changes.length; i++) {
+        var row = make("tr");
+        row.appendChild(make("td", changes[i].old, "old"));
+        row.appendChild(make("td", changes[i].new, "new"));
+        table.appendChild(row);
+      }
+      details.appendChild(table);
+      if (total > changes.length) {
+        details.appendChild(make("p", "Показаны первые " + changes.length + ".", "hint"));
+      }
+    }
+
+    function showDocResult(data) {
+      docResult.innerHTML = "";
+
+      if (data.error) {
+        notice(docResult, data.error, "error");
+        return;
+      }
+
+      if (data.no_title) {
+        var box = make("div", "", "notice warning");
+        box.appendChild(make("p", data.message));
+        var again = make("button", "Все равно оформить");
+        again.type = "button";
+        again.addEventListener("click", function () {
+          sendForm(docForm, function (result) {
+            showDocResult(result);
+            if (!result.error && !result.gost && !result.no_title) {
+              docForm.reset();
+            }
+            docResult.scrollIntoView();
+          }, { skip_title: "1" });
+        });
+        box.appendChild(again);
+        docResult.appendChild(box);
+        return;
+      }
+
+      if (data.gost) {
+        notice(docResult, data.message, "success");
+      } else {
+        var block = make("div", "", "result-block");
+        block.appendChild(downloadLink(data.url, "Скачать готовый файл"));
+        if (data.title_inserted) {
+          block.appendChild(make("p", "Титульный лист вставлен в начало документа.", "criteria-list"));
+        }
+        if (data.criteria.length > 0) {
+          block.appendChild(make("p", "Изменено по критериям:", "criteria-list"));
+          var list = make("ul", "", "criteria-list");
+          for (var i = 0; i < data.criteria.length; i++) {
+            list.appendChild(make("li", data.criteria[i].n + " — " + data.criteria[i].name));
+          }
+          block.appendChild(list);
+        }
+        if (data.changes_total > 0) {
+          showChanges(block, data.changes, data.changes_total);
+        }
+        docResult.appendChild(block);
+        if (data.message) {
+          notice(docResult, data.message, "warning");
+        }
+      }
+
+      for (var j = 0; j < data.warnings.length; j++) {
+        notice(docResult, data.warnings[j], "warning");
+      }
+    }
+
+    docForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+      sendForm(docForm, function (data) {
+        showDocResult(data);
+        if (!data.error && !data.gost && !data.no_title) {
+          docForm.reset();
+        }
+        docResult.scrollIntoView();
+      });
+    });
+
+    document.getElementById("clear-button").addEventListener("click", function () {
+      docForm.reset();
+      docResult.innerHTML = "";
+    });
+
+
+
+    var titleForm = document.getElementById("title-form");
+    var titleResult = document.getElementById("title-result");
+
+    titleForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+      sendForm(titleForm, function (data) {
+        titleResult.innerHTML = "";
+        if (data.error) {
+          notice(titleResult, data.error, "error");
+          return;
+        }
+        notice(titleResult, "Титульный лист готов и выбран на вкладке «Документ». Его можно скачать по ссылке ниже.", "success");
+        titleResult.appendChild(downloadLink(data.url, "Скачать титульный лист"));
+
+        var select = document.getElementById("title_file");
+        var option = make("option", data.label);
+        option.value = data.file;
+        select.insertBefore(option, select.options[1] || null);
+        select.value = data.file;
+        document.getElementById("title-hint").style.display = "none";
+      });
+    });
+
+
+
+    var pptxForm = document.getElementById("pptx-form");
+    var pptxResult = document.getElementById("pptx-result");
+
+    pptxForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+      sendForm(pptxForm, function (data) {
+        pptxResult.innerHTML = "";
+        if (data.error) {
+          notice(pptxResult, data.error, "error");
+          return;
+        }
+        if (data.issues.length === 0) {
+          notice(pptxResult, "Замечаний не найдено.", "success");
+          return;
+        }
+        var table = make("table");
+        var head = make("tr");
+        var names = ["Слайд", "Замечание", "Пояснение"];
+        for (var i = 0; i < names.length; i++) {
+          head.appendChild(make("th", names[i]));
+        }
+        table.appendChild(head);
+        for (var j = 0; j < data.issues.length; j++) {
+          var row = make("tr");
+          row.appendChild(make("td", String(data.issues[j].slide_number), "slide-number"));
+          row.appendChild(make("td", data.issues[j].issue_type));
+          row.appendChild(make("td", data.issues[j].details));
+          table.appendChild(row);
+        }
+        pptxResult.appendChild(table);
+      });
+    });
+  </script>
+</body>
+</html>
