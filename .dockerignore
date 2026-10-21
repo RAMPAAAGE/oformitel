@@ -1,0 +1,9 @@
+backend/uploads/
+backend/outputs/
+backend/build/
+backend/dist/
+backend/.venv/
+electron/node_modules/
+electron/dist/
+**/__pycache__/
+*.pyc
