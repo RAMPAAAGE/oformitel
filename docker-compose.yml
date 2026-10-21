@@ -1,0 +1,12 @@
+# Этот compose-файл нужен только для разработки и тестирования backend.
+services:
+  backend:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      OFORMITEL_HOST: 0.0.0.0
+    volumes:
+      - ./backend/uploads:/app/backend/uploads
+      - ./backend/outputs:/app/backend/outputs
+      - ./backend/profiles:/app/backend/profiles

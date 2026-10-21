@@ -1,0 +1,12 @@
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/outputs/*
+!backend/outputs/.gitkeep
+backend/build/
+backend/dist/
+backend/.venv/
+.pyinstaller-cache/
+electron/node_modules/
+electron/dist/
+__pycache__/
+*.pyc

@@ -1,0 +1,45 @@
+{
+  "name": "oformitel-dokumentov",
+  "version": "1.0.0",
+  "description": "Настольная программа для оформления документов DOCX",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:backend": "node build_backend.js",
+    "dist": "npm run build:backend && electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^37.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "ru.school.oformitel",
+    "productName": "Оформитель документов",
+    "icon": "build/icon.png",
+    "directories": {
+      "output": "../../билды"
+    },
+    "files": [
+      "main.js",
+      "package.json",
+      "build/icon.png",
+      "build_backend.js"
+    ],
+    "extraResources": [
+      {
+        "from": "../backend/dist",
+        "to": "backend",
+        "filter": [
+          "oformitel-backend",
+          "oformitel-backend.exe"
+        ]
+      }
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    }
+  }
+}
