@@ -2,7 +2,7 @@ const { existsSync } = require("fs");
 const { spawnSync } = require("child_process");
 const path = require("path");
 
-let command = "python3";
+let command = process.platform === "win32" ? "python" : "python3";
 const projectFolder = path.join(__dirname, "..");
 const localPython = process.platform === "win32"
   ? path.join(projectFolder, "backend", ".venv", "Scripts", "python.exe")
@@ -13,10 +13,6 @@ if (existsSync(localPython)) {
 }
 
 const args = [path.join(__dirname, "..", "backend", "build_backend.py")];
-
-if (process.platform === "win32") {
-  command = "python";
-}
 
 const result = spawnSync(command, args, { stdio: "inherit" });
 
