@@ -1,0 +1,88 @@
+# Собирает приложение для Windows и macOS и выкладывает его в Releases.
+# Запускается, когда в репозиторий отправлен тег вида v1.0.0,
+# или вручную со вкладки Actions (тогда файлы будут только в артефактах сборки).
+name: Сборка и релиз
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: --win
+            files: electron/release/*.exe
+          - os: macos-latest
+            target: --mac
+            files: electron/release/*.dmg
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: electron/package-lock.json
+
+      - name: Установка библиотек Python
+        run: python -m pip install -r backend/requirements.txt -r backend/requirements-build.txt
+
+      - name: Тесты
+        run: python -m unittest discover -s tests -v
+
+      - name: Установка библиотек Electron
+        working-directory: electron
+        run: npm ci
+
+      - name: Сборка backend
+        working-directory: electron
+        run: npm run build:backend
+
+      - name: Сборка приложения
+        working-directory: electron
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: >
+          npx electron-builder ${{ matrix.target }} --publish never
+          --config.directories.output=release
+          --config.nsis.artifactName=Oformitel-Setup.exe
+          --config.dmg.artifactName=Oformitel-mac.dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oformitel-${{ matrix.os }}
+          path: ${{ matrix.files }}
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: files
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: files/*
+          body: |
+            ## Скачать
+
+            - **Windows** — `Oformitel-Setup.exe`: запусти и программа установится сама.
+            - **macOS (Apple Silicon)** — `Oformitel-mac.dmg`: открой и перетащи приложение в «Программы».
+              При первом запуске нажми на приложение правой кнопкой → «Открыть».

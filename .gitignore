@@ -10,3 +10,4 @@ electron/node_modules/
 electron/dist/
 __pycache__/
 *.pyc
+electron/release/

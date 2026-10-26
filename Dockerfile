@@ -7,7 +7,7 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend .
-COPY electron/build/index.html /app/electron/build/index.html
+COPY electron/build/index.html electron/build/style.css /app/electron/build/
 
 EXPOSE 5000
 
