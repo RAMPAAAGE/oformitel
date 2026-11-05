@@ -1,133 +1,149 @@
+/* Вариант 2: «мягкий» дизайн из второй версии проекта —
+   тёмно-синие заголовки, скруглённые карточки с тенью, цветные плашки сообщений. */
+
 :root {
   color-scheme: light;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #202733;
-  background: #f6f7f9;
-  --ink: #202733;
-  --muted: #667085;
-  --line: #d9dee7;
-  --blue: #1c5fb8;
-  --blue-dark: #15498e;
+  font-family: Arial, "Helvetica Neue", sans-serif;
+  color: #1f2937;
+  background: #f3f6fb;
+  --navy: #123c70;
+  --blue: #1965b0;
+  --blue-dark: #0f4f90;
+  --muted: #4b5563;
+  --line: #dce5f2;
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; }
+body { margin: 0; background: #f3f6fb; }
 
 main {
-  width: min(940px, calc(100% - 40px));
+  width: min(920px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 48px 0 64px;
+  padding: 42px 0 56px;
 }
 
-h1 { margin: 0; color: var(--ink); font-size: clamp(30px, 5vw, 42px); letter-spacing: -0.03em; }
-h2 { margin: 0 0 22px; font-size: 23px; letter-spacing: -0.02em; }
-.intro { max-width: 690px; margin: 12px 0 28px; color: var(--muted); line-height: 1.55; }
+h1 { margin: 0; color: var(--navy); font-size: clamp(28px, 5vw, 40px); }
+h2 { margin: 0 0 20px; font-size: 22px; color: #1f2937; }
+.intro { max-width: 680px; margin: 12px 0 24px; color: var(--muted); line-height: 1.55; }
 
-.tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--line); margin-bottom: 24px; }
+/* вкладки */
+.tabs { display: flex; gap: 8px; border-bottom: 2px solid var(--line); margin-bottom: 20px; }
 .tab-button {
   width: auto;
-  padding: 12px 0 13px;
+  margin: 0 0 -2px;
+  padding: 12px 18px;
   border: 0;
-  border-bottom: 2px solid transparent;
-  margin: 0;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
   background: transparent;
   color: var(--muted);
-  font-weight: 650;
+  font-weight: 700;
+  font-size: 15px;
   cursor: pointer;
 }
-.tab-button:hover, .tab-button.active { color: var(--blue-dark); }
-.tab-button.active { border-bottom-color: var(--blue); }
+.tab-button:hover { color: var(--navy); background: transparent; }
+.tab-button.active { color: var(--navy); border-bottom-color: var(--blue); }
 .tab-page { display: none; }
 .tab-page.active { display: block; }
 
+/* карточки */
 .card {
-  margin-top: 18px;
+  margin-top: 20px;
   padding: 28px;
-  background: #fff;
+  background: #ffffff;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 16px;
+  box-shadow: 0 12px 30px rgba(33, 67, 111, 0.08);
 }
 
-label { display: block; margin: 17px 0 7px; color: #344054; font-weight: 650; }
+/* поля формы */
+label { display: block; margin: 16px 0 7px; font-weight: 600; }
 input, select, button {
   width: 100%;
-  min-height: 44px;
-  padding: 10px 12px;
-  border: 1px solid #b9c2d0;
-  border-radius: 7px;
+  padding: 11px 12px;
+  border: 1px solid #b8c7dc;
+  border-radius: 9px;
   font: inherit;
 }
-input[type="file"] { padding: 7px; background: #fbfcfd; }
+input:focus, select:focus { outline: 3px solid #cfe1fa; border-color: #3075be; }
+
+button {
+  margin-top: 24px;
+  border: 0;
+  background: var(--blue);
+  color: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+}
+button:hover { background: var(--blue-dark); }
+button:disabled { background: #7a9cc4; cursor: wait; }
+button.gray { margin-top: 12px; background: #e5e9f0; color: var(--navy); }
+button.gray:hover { background: #d4dbe6; }
 
 /* своя кнопка выбора файла: настоящий input прозрачный и лежит поверх неё */
 .file-picker {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   margin: 0;
-  min-height: 44px;
   padding: 6px;
-  border: 1px solid #b9c2d0;
-  border-radius: 7px;
-  background: #fbfcfd;
+  border: 1px dashed #9fb4d3;
+  border-radius: 9px;
+  background: #f8fbff;
   font-weight: 400;
   cursor: pointer;
 }
-.file-picker input[type="file"] {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
-}
+.file-picker input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .file-button {
-  padding: 6px 14px;
-  border-radius: 5px;
-  background: #eef1f5;
-  color: #344054;
-  font-weight: 650;
+  padding: 7px 14px;
+  border-radius: 7px;
+  background: #e5e9f0;
+  color: var(--navy);
+  font-weight: 700;
   white-space: nowrap;
 }
-.file-picker:hover .file-button { background: #e1e6ee; }
+.file-picker:hover .file-button { background: #d4dbe6; }
 .file-name { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.file-picker:focus-within { outline: 3px solid #c9dcf7; outline-offset: 1px; border-color: var(--blue); }
-input:focus, select:focus, button:focus-visible {
-  outline: 3px solid #c9dcf7;
-  outline-offset: 1px;
-  border-color: var(--blue);
-}
-button { margin-top: 24px; border: 0; background: var(--blue); color: #fff; font-weight: 700; cursor: pointer; }
-button:hover { background: var(--blue-dark); }
-button:disabled { background: #8da8ca; cursor: wait; }
-button.gray { margin-top: 10px; background: #eef1f5; color: #344054; }
-button.gray:hover { background: #e1e6ee; }
+.file-picker:focus-within { outline: 3px solid #cfe1fa; border-color: #3075be; }
 
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 18px; }
-.notice { margin: 0 0 18px; padding: 13px 15px; border-left: 4px solid; line-height: 1.45; }
-.success { color: #17603b; background: #eaf7ef; border-color: #36a269; }
-.error { color: #9b2c2c; background: #fff0f0; border-color: #d64545; }
-.warning { color: #875a13; background: #fff8e6; border-color: #d99b2b; }
 
-.result-block { margin: 0 0 18px; padding: 17px 18px; background: #edf5ff; border: 1px solid #b9d2f4; border-radius: 8px; }
-.result-block a { display: inline-block; color: var(--blue-dark); font-size: 16px; font-weight: 750; }
+/* сообщения */
+.notice { margin: 0 0 20px; padding: 13px 15px; border-radius: 9px; line-height: 1.45; }
+.success { color: #166534; background: #dcfce7; }
+.error { color: #991b1b; background: #fee2e2; }
+.warning { color: #92400e; background: #fef3c7; }
+
+/* блок результата: ссылка «скачать» и список критериев */
+.result-block {
+  margin: 0 0 20px;
+  padding: 16px 18px;
+  background: #f0f7ff;
+  border: 1px solid #bcd4f4;
+  border-radius: 10px;
+}
+.result-block a { display: inline-block; font-size: 16px; font-weight: 700; color: #0d5599; text-decoration: none; }
 .result-block a:hover { text-decoration: underline; }
-.criteria-list { margin: 8px 0 0; color: #475467; font-size: 14px; }
-details summary { color: var(--blue-dark); font-weight: 700; cursor: pointer; }
-.hint { margin: 0; color: var(--muted); font-size: 14px; }
+.result-block button { width: auto; padding: 9px 16px; }
+.criteria-list { margin: 8px 0 0; color: #374151; font-size: 14px; }
+details summary { cursor: pointer; color: #0d5599; font-weight: 700; }
+.hint { margin: 0; color: #6b7280; font-size: 14px; }
+#title-result a { display: inline-block; margin-bottom: 20px; color: #0d5599; font-weight: 700; }
 .profile-note { margin-top: 14px; max-width: 700px; line-height: 1.45; }
 
-table { width: 100%; margin-top: 10px; border-collapse: collapse; }
-th, td { padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: left; font-size: 14px; vertical-align: top; }
-th { color: #667085; font-size: 12px; letter-spacing: 0.05em; }
+/* таблицы */
+table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #e5e9f0; font-size: 14px; vertical-align: top; }
+th { color: var(--muted); font-size: 13px; text-transform: uppercase; }
 .changes td { font-size: 13px; }
-.changes .old { color: #9b2c2c; }
-.changes .new { color: #17603b; }
-.slide-number { color: var(--blue-dark); font-weight: 750; white-space: nowrap; }
+.changes .old { color: #991b1b; }
+.changes .new { color: #166534; }
+.slide-number { font-weight: 700; color: var(--navy); white-space: nowrap; }
 
 @media (max-width: 620px) {
-  main { width: min(100% - 24px, 940px); padding-top: 28px; }
+  main { width: min(100% - 24px, 920px); padding-top: 26px; }
   .card { padding: 20px; }
   .grid { grid-template-columns: 1fr; }
-  .tabs { gap: 16px; overflow-x: auto; }
-  .tab-button { flex: 0 0 auto; }
+  .tabs { flex-wrap: wrap; }
 }
