@@ -339,7 +339,11 @@
           block.appendChild(make("p", "Изменено по критериям:", "criteria-list"));
           var list = make("ul", "", "criteria-list");
           for (var i = 0; i < data.criteria.length; i++) {
-            list.appendChild(make("li", data.criteria[i].n + " — " + data.criteria[i].name));
+            var line = data.criteria[i].n + " — " + data.criteria[i].name;
+            if (data.criteria[i].details) {
+              line += " (" + data.criteria[i].details + ")";  // например: левое 2 → 3 см
+            }
+            list.appendChild(make("li", line));
           }
           block.appendChild(list);
         }

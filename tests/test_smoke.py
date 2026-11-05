@@ -306,6 +306,20 @@ class SmokeTests(unittest.TestCase):
         edits, _ = find_edits(bad, False, True, None)
         self.assertTrue(len(edits) >= 3)
 
+    def test_gost_profile_explains_margin_change(self):
+        response = self.client.post(
+            "/apply",
+            data={
+                "document": (make_badly_formatted_docx(), "gost.docx"),
+                "profile_file": "02_gost_7_32.json",
+                "skip_title": "1",
+            },
+            content_type="multipart/form-data",
+        )
+        criteria = response.get_json()["criteria"]
+        margins = [c for c in criteria if c["n"] == 1][0]
+        self.assertEqual(margins["details"], "верхнее 1 → 2 см, нижнее 1 → 2 см, левое 1 → 3 см, правое 1 → 1,5 см")
+
     def test_presentation_traps_are_reported(self):
         with tempfile.TemporaryDirectory() as folder:
             path = os.path.join(folder, "traps.pptx")

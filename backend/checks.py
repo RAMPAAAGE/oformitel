@@ -291,6 +291,31 @@ def check_punct(doc, layout):
     return punct_work(doc, layout) == []
 
 
+# --- пояснения к исправлениям ---
+
+def cm_text(value):
+    # 2.0 -> "2", 1.5 -> "1,5"
+    return ("%g" % round(value, 2)).replace(".", ",")
+
+
+def margins_description(doc, profile):
+    # что именно не так с полями: "левое 2 → 3 см, правое 2 → 1,5 см"
+    section = doc.sections[0]
+    sides = [
+        ("верхнее", section.top_margin, profile["margin_top_cm"]),
+        ("нижнее", section.bottom_margin, profile["margin_bottom_cm"]),
+        ("левое", section.left_margin, profile["margin_left_cm"]),
+        ("правое", section.right_margin, profile["margin_right_cm"]),
+    ]
+    parts = []
+    for name, real, needed in sides:
+        if real is None:
+            continue
+        if abs(real.cm - needed) > 0.05:
+            parts.append(name + " " + cm_text(real.cm) + " → " + cm_text(needed) + " см")
+    return ", ".join(parts)
+
+
 # --- предупреждения (их программа не исправляет, а только сообщает) ---
 
 def structure_warnings(doc, profile):

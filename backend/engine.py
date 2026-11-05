@@ -16,7 +16,7 @@ from docx import Document
 from checks import (
     check_captions, check_font, check_indent, check_margins, check_numbers, check_punct,
     check_size, check_spacing, check_themes, check_toc,
-    find_warnings, punct_work, spell_warning, structure_warnings,
+    find_warnings, margins_description, punct_work, spell_warning, structure_warnings,
 )
 from fixes import (
     add_captions, apply_font, apply_indent, apply_margins, apply_size, apply_spacing,
@@ -96,6 +96,10 @@ def check_and_format_document(input_path, profile_path, output_path, title_path=
     failed = check_document(doc, profile)
     had_title = len(analyze_layout(doc)["title"]) > 0
     spell = spell_warning(doc)
+    # пояснения для пользователя: что именно было не так (пока - для полей)
+    details = {}
+    if 1 in failed:
+        details[1] = margins_description(doc, profile)
 
     # шаг 2: всё правильно и титульный лист вставлять не нужно - файл не трогаем
     if not failed and not title_path:
@@ -133,6 +137,7 @@ def check_and_format_document(input_path, profile_path, output_path, title_path=
         "is_correct": False,
         "profile_name": profile.get("name", ""),
         "failed": failed,
+        "details": details,
         "title_inserted": bool(title_path),
         "changes": changes,
         "warnings": warnings + spell,
