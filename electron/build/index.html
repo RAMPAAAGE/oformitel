@@ -7,18 +7,25 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+  <!-- Вариант 3: окно похоже на лист тетради в клетку.
+       Слева «поля» с вкладками, справа от красной линии - сама работа. -->
+  <div class="app">
+  <aside class="margin">
+    <div class="brand-mark" aria-hidden="true">ОД</div>
+    <nav class="tabs">
+      <button type="button" class="tab-button" data-tab="document">Документ</button>
+      <button type="button" class="tab-button" data-tab="title_page">Титульный лист</button>
+      <button type="button" class="tab-button" data-tab="presentation">Презентация</button>
+    </nav>
+    <p class="margin-note">Работает без интернета: файлы остаются на этом компьютере.</p>
+  </aside>
+
   <main>
     <h1>Оформитель документов</h1>
     <p class="intro">
       Приведение работы к требованиям конференции: оформление документа,
       создание титульного листа и проверка презентации.
     </p>
-
-    <nav class="tabs">
-      <button type="button" class="tab-button" data-tab="document">Документ</button>
-      <button type="button" class="tab-button" data-tab="title_page">Титульный лист</button>
-      <button type="button" class="tab-button" data-tab="presentation">Презентация</button>
-    </nav>
 
     <section class="tab-page" data-tab="document">
 
@@ -39,7 +46,7 @@
           <label class="file-picker">
             <input id="document" name="document" type="file" accept=".docx" required>
             <span class="file-button">Выбрать файл</span>
-            <span class="file-name">Файл не выбран</span>
+            <span class="file-name">или перетащите файл сюда</span>
           </label>
 
           <label for="profile_file">Профиль оформления</label>
@@ -168,7 +175,7 @@
           <label class="file-picker">
             <input id="presentation" name="presentation" type="file" accept=".pptx" required>
             <span class="file-button">Выбрать файл</span>
-            <span class="file-name">Файл не выбран</span>
+            <span class="file-name">или перетащите файл сюда</span>
           </label>
 
           <button type="submit">Проверить презентацию</button>
@@ -176,6 +183,7 @@
       </section>
     </section>
   </main>
+  </div>
 
   <script>
     function showTab(tabName) {
@@ -213,11 +221,12 @@
     // Рядом показываем имя выбранного файла.
     function connectFilePicker(input) {
       var nameBox = input.parentNode.querySelector(".file-name");
+      var emptyText = nameBox.textContent;  // подпись, пока файл не выбран
       function update() {
         if (input.files.length > 0) {
           nameBox.textContent = input.files[0].name;
         } else {
-          nameBox.textContent = "Файл не выбран";
+          nameBox.textContent = emptyText;
         }
       }
       input.addEventListener("change", update);
@@ -339,11 +348,15 @@
           block.appendChild(make("p", "Изменено по критериям:", "criteria-list"));
           var list = make("ul", "", "criteria-list");
           for (var i = 0; i < data.criteria.length; i++) {
-            var line = data.criteria[i].n + " — " + data.criteria[i].name;
+            var line = data.criteria[i].name;
             if (data.criteria[i].details) {
               line += " (" + data.criteria[i].details + ")";  // например: левое 2 → 3 см
             }
-            list.appendChild(make("li", line));
+            // номер критерия обведён красным кружком, как пометка учителя
+            var item = make("li");
+            item.appendChild(make("span", String(data.criteria[i].n), "criterion-number"));
+            item.appendChild(make("span", line));
+            list.appendChild(item);
           }
           block.appendChild(list);
         }
