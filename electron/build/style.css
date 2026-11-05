@@ -23,20 +23,22 @@ h1 { margin: 0; color: var(--ink); font-size: clamp(30px, 5vw, 42px); letter-spa
 h2 { margin: 0 0 22px; font-size: 23px; letter-spacing: -0.02em; }
 .intro { max-width: 690px; margin: 12px 0 28px; color: var(--muted); line-height: 1.55; }
 
-.tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--line); margin-bottom: 24px; }
+.tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--line); margin-bottom: 24px; }
 .tab-button {
   width: auto;
-  padding: 12px 0 13px;
+  padding: 12px 14px 13px;
   border: 0;
   border-bottom: 2px solid transparent;
+  border-radius: 7px 7px 0 0;
   margin: 0;
   background: transparent;
   color: var(--muted);
   font-weight: 650;
   cursor: pointer;
 }
-.tab-button:hover, .tab-button.active { color: var(--blue-dark); }
-.tab-button.active { border-bottom-color: var(--blue); }
+.tab-button.active { color: var(--blue-dark); border-bottom-color: var(--blue); }
+/* при наведении вкладка синяя, а текст белый - иначе синий текст сливается с синим фоном */
+.tab-button:hover { background: var(--blue-dark); color: #fff; }
 .tab-page { display: none; }
 .tab-page.active { display: block; }
 
