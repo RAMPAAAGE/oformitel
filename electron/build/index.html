@@ -36,7 +36,11 @@
         <h2>Оформить документ</h2>
         <form id="doc-form" action="{{ url_for('apply_profile') }}" method="post" enctype="multipart/form-data">
           <label for="document">Документ Word</label>
-          <input id="document" name="document" type="file" accept=".docx" required>
+          <label class="file-picker">
+            <input id="document" name="document" type="file" accept=".docx" required>
+            <span class="file-button">Выбрать файл</span>
+            <span class="file-name">Файл не выбран</span>
+          </label>
 
           <label for="profile_file">Профиль оформления</label>
           <select id="profile_file" name="profile_file" required>
@@ -161,7 +165,11 @@
         <h2>Проверить презентацию</h2>
         <form id="pptx-form" action="{{ url_for('analyze_pptx') }}" method="post" enctype="multipart/form-data">
           <label for="presentation">Файл презентации</label>
-          <input id="presentation" name="presentation" type="file" accept=".pptx" required>
+          <label class="file-picker">
+            <input id="presentation" name="presentation" type="file" accept=".pptx" required>
+            <span class="file-button">Выбрать файл</span>
+            <span class="file-name">Файл не выбран</span>
+          </label>
 
           <button type="submit">Проверить презентацию</button>
         </form>
@@ -201,6 +209,28 @@
     showTab("{{ active_tab }}");
 
 
+    // Своя кнопка выбора файла: стандартная на английской системе пишет "Choose File".
+    // Рядом показываем имя выбранного файла.
+    function connectFilePicker(input) {
+      var nameBox = input.parentNode.querySelector(".file-name");
+      function update() {
+        if (input.files.length > 0) {
+          nameBox.textContent = input.files[0].name;
+        } else {
+          nameBox.textContent = "Файл не выбран";
+        }
+      }
+      input.addEventListener("change", update);
+      // событие reset приходит до очистки формы, поэтому обновляем подпись чуть позже
+      input.form.addEventListener("reset", function () { setTimeout(update, 0); });
+    }
+
+    var fileInputs = document.querySelectorAll("input[type=file]");
+    for (var k = 0; k < fileInputs.length; k++) {
+      connectFilePicker(fileInputs[k]);
+    }
+
+
 
     function make(tag, text, className) {
       var item = document.createElement(tag);
@@ -217,10 +247,10 @@
       box.appendChild(make("p", text, "notice " + kind));
     }
 
-    function downloadLink(url, text) {
+    function downloadLink(url, text, fileName) {
       var link = make("a", text);
       link.href = url;
-      link.setAttribute("download", "");
+      link.setAttribute("download", fileName || "");
       return link;
     }
 
@@ -286,7 +316,7 @@
         again.addEventListener("click", function () {
           sendForm(docForm, function (result) {
             showDocResult(result);
-            if (!result.error && !result.gost && !result.no_title) {
+            if (!result.error && !result.correct && !result.no_title) {
               docForm.reset();
             }
             docResult.scrollIntoView();
@@ -297,11 +327,11 @@
         return;
       }
 
-      if (data.gost) {
+      if (data.correct) {
         notice(docResult, data.message, "success");
       } else {
         var block = make("div", "", "result-block");
-        block.appendChild(downloadLink(data.url, "Скачать готовый файл"));
+        block.appendChild(downloadLink(data.url, "Скачать готовый файл", data.download_name));
         if (data.title_inserted) {
           block.appendChild(make("p", "Титульный лист вставлен в начало документа.", "criteria-list"));
         }
@@ -331,7 +361,7 @@
       event.preventDefault();
       sendForm(docForm, function (data) {
         showDocResult(data);
-        if (!data.error && !data.gost && !data.no_title) {
+        if (!data.error && !data.correct && !data.no_title) {
           docForm.reset();
         }
         docResult.scrollIntoView();

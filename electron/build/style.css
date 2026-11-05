@@ -58,6 +58,39 @@ input, select, button {
   font: inherit;
 }
 input[type="file"] { padding: 7px; background: #fbfcfd; }
+
+/* своя кнопка выбора файла: настоящий input прозрачный и лежит поверх неё */
+.file-picker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  min-height: 44px;
+  padding: 6px;
+  border: 1px solid #b9c2d0;
+  border-radius: 7px;
+  background: #fbfcfd;
+  font-weight: 400;
+  cursor: pointer;
+}
+.file-picker input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.file-button {
+  padding: 6px 14px;
+  border-radius: 5px;
+  background: #eef1f5;
+  color: #344054;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.file-picker:hover .file-button { background: #e1e6ee; }
+.file-name { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-picker:focus-within { outline: 3px solid #c9dcf7; outline-offset: 1px; border-color: var(--blue); }
 input:focus, select:focus, button:focus-visible {
   outline: 3px solid #c9dcf7;
   outline-offset: 1px;

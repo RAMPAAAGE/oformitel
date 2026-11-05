@@ -1,4 +1,9 @@
+# Правила пунктуации. Каждое правило смотрит на текст абзаца
+# и возвращает список правок, ничего не меняя само.
+
 from docx.oxml.ns import qn
+
+from word_helpers import is_caption
 
 W_T = qn("w:t")
 W_TAB = qn("w:tab")
@@ -100,13 +105,6 @@ def apply_edits(nodes, edits):
             cut_text(nodes, start, end, new)
 
 
-def show(text, start, end):
-    left = max(0, start - 25)
-    right = min(len(text), end + 25)
-    piece = text[left:right].replace("\n", " ").replace("\t", " ")
-    return ("…" if left > 0 else "") + piece + ("…" if right < len(text) else "")
-
-
 def make_changes(text, edits):
     # правки рядом друг с другом показываем одной строкой «было → стало»
     groups = []
@@ -197,16 +195,16 @@ def token_at(text, i):
     return text[a:b]
 
 
+def is_latin(ch):
+    # латинская буква a-z (в русском тексте так обычно пишут код и имена файлов)
+    return "a" <= ch.lower() <= "z"
+
+
 def is_link(token):
     for part in ["http", "www.", "@", "/"]:
         if part in token:
             return True
     return False
-
-
-def is_caption(text):
-    t = text.strip().lower()
-    return t.startswith(("рис.", "рисунок", "рис ", "рис("))
 
 
 def ends_line(text, i):
@@ -244,6 +242,8 @@ def space_before(text):
             continue
         if ch == "." and (text[i + 1:i + 2] == "." or text[i - 2:i - 1] == "."):
             continue
+        if ch == "." and text[i + 1:i + 2].isalnum():
+            continue  # ".docx", ".exe" - это расширение файла, пробел перед ним нужен
         a = i
         while a > 0 and text[a - 1] == " ":
             a -= 1
@@ -258,6 +258,8 @@ def no_space_after(text):
         ch, nxt = text[i], text[i + 1]
         if ch not in ",;:!?." or is_link(token_at(text, i)):
             continue
+        if ch == ":" and is_latin(text[i - 1]) and is_latin(nxt):
+            continue  # "w:p" - имя тега в коде, а не двоеточие в предложении
         letter_next = nxt.isalpha() or (nxt in "«“\"" and text[i + 2:i + 3].isalpha())
         if not letter_next:
             continue
@@ -499,17 +501,26 @@ def find_edits(text, is_list, check_end, prev_dot):
     more, prev_dot = line_edits(text, is_list, check_end, prev_dot)
     edits += more
     edits.sort()
+    # убираем правки, которые накладываются друг на друга или повторяются
     result = []
     last_end = -1
     for edit in edits:
         if edit[0] < last_end or edit in result:
             continue
-        dot_again = edit == (edit[0], edit[0], ".") and result and result[-1][1] == edit[0] and result[-1][2].endswith(".")
-        if dot_again:
+        if is_extra_dot(edit, result):
             continue
         result.append(edit)
         last_end = max(last_end, edit[1])
     return result, prev_dot
+
+
+def is_extra_dot(edit, result):
+    # точку не ставим, если предыдущая правка в этом же месте уже закончилась точкой (например "т.д.")
+    start, end, new = edit
+    if new != "." or start != end or not result:
+        return False
+    last_start, last_end, last_new = result[-1]
+    return last_end == start and last_new.endswith(".")
 
 
 # --- пометки Word: красные волнистые линии ---

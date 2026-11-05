@@ -17,7 +17,9 @@ sys.path.insert(0, BACKEND_FOLDER)
 os.environ["OFORMITEL_DATA_FOLDER"] = tempfile.mkdtemp(prefix="oformitel-tests-")
 
 from app import OUTPUTS_FOLDER, PROFILES_FOLDER, app  # noqa: E402
-from engine import analyze_layout, fix_toc  # noqa: E402
+from engine import check_and_format_document  # noqa: E402
+from fixes import fix_toc  # noqa: E402
+from layout import analyze_layout  # noqa: E402
 from pptx_engine import analyze_presentation  # noqa: E402
 
 
@@ -118,7 +120,7 @@ class SmokeTests(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("gost", response.get_json())
+        self.assertIn("correct", response.get_json())
 
     def test_custom_profile_is_saved_and_applied(self):
         profile_values = {
@@ -163,6 +165,7 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         result = response.get_json()
         self.assertIn("url", result)
+        self.assertEqual(result["download_name"], "оформлено_custom-profile.docx")
         self.assertTrue(any("обязательный титульный лист" in warning for warning in result["warnings"]))
         self.assertTrue(any("обязательное оглавление" in warning for warning in result["warnings"]))
 
@@ -219,6 +222,7 @@ class SmokeTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"--blue", response.data)
+        response.close()
 
     def test_toc_trap_keeps_page_number_on_same_line(self):
         document = make_toc_docx()
@@ -228,6 +232,79 @@ class SmokeTests(unittest.TestCase):
         entries = [entry for entry in layout["toc"] if entry.text.strip()]
         self.assertEqual([entry.text for entry in entries], ["Введение\t3", "Заключение\t10"])
         self.assertTrue(all(entry.paragraph_format.left_indent.cm == 0 for entry in entries))
+
+    def test_uploaded_file_is_deleted_after_processing(self):
+        from app import UPLOADS_FOLDER
+
+        self.client.post(
+            "/apply",
+            data={
+                "document": (make_docx(), "delete-me.docx"),
+                "profile_file": "01_inzhenery_budushchego.json",
+                "skip_title": "1",
+            },
+            content_type="multipart/form-data",
+        )
+
+        left_files = [name for name in os.listdir(UPLOADS_FOLDER) if name.startswith("delete-me")]
+        self.assertEqual(left_files, [])
+
+    def test_paragraph_with_missing_style_does_not_crash(self):
+        # бывают документы, где у абзаца указан стиль, которого нет в файле
+        document = Document()
+        paragraph = document.add_paragraph("Абзац со стилем, которого нет в документе.")
+        paragraph._p.get_or_add_pPr().get_or_add_pStyle().val = "NoSuchStyle"
+        file_data = io.BytesIO()
+        document.save(file_data)
+        file_data.seek(0)
+
+        response = self.client.post(
+            "/apply",
+            data={
+                "document": (file_data, "missing-style.docx"),
+                "profile_file": "01_inzhenery_budushchego.json",
+                "skip_title": "1",
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("error", response.get_json())
+
+    def test_correct_document_message_names_the_profile(self):
+        with tempfile.TemporaryDirectory() as folder:
+            first = os.path.join(folder, "first.docx")
+            second = os.path.join(folder, "second.docx")
+            with open(first, "wb") as file:
+                file.write(make_badly_formatted_docx().read())
+            profile = os.path.join(PROFILES_FOLDER, "01_inzhenery_budushchego.json")
+            check_and_format_document(first, profile, second)  # первый раз исправляем
+
+            with open(second, "rb") as file:
+                response = self.client.post(
+                    "/apply",
+                    data={
+                        "document": (io.BytesIO(file.read()), "second.docx"),
+                        "profile_file": "01_inzhenery_budushchego.json",
+                        "skip_title": "1",
+                    },
+                    content_type="multipart/form-data",
+                )
+
+        result = response.get_json()
+        self.assertTrue(result["correct"])
+        self.assertIn("Инженеры будущего", result["message"])
+
+    def test_punctuation_keeps_file_extensions_and_tag_names(self):
+        from punctuation import find_edits
+
+        good = "Установщик бывает двух видов: .exe для Windows и тег w:p для абзаца."
+        edits, _ = find_edits(good, False, True, None)
+        self.assertEqual(edits, [])
+
+        bad = "Это  ошибка ,и тут тоже:пропущен пробел"
+        edits, _ = find_edits(bad, False, True, None)
+        self.assertTrue(len(edits) >= 3)
 
     def test_presentation_traps_are_reported(self):
         with tempfile.TemporaryDirectory() as folder:
