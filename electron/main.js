@@ -2,6 +2,9 @@ const { app, BrowserWindow, dialog } = require("electron");
 const { spawn } = require("child_process");
 const path = require("path");
 
+// Electron - это "окно" программы. Вся работа с документами идёт в Python (Flask),
+// а окно просто показывает его страницу по адресу http://127.0.0.1:<порт>.
+
 let flaskProcess;
 let applicationIsClosing = false;
 let startupErrorWasShown = false;
@@ -68,7 +71,7 @@ function startFlask() {
   const environment = {
     ...process.env,
     OFORMITEL_DATA_FOLDER: app.getPath("userData"),
-    OFORMITEL_PORT: "0",
+    OFORMITEL_PORT: "0", // 0 значит "возьми любой свободный порт"
   };
 
   flaskProcess = spawn(backend.command, backend.arguments, {
@@ -138,12 +141,9 @@ function stopFlask() {
 }
 
 
-function startApplication() {
-  startFlask();
-}
-
-
-app.whenReady().then(startApplication);
+// Порядок работы: Electron запускает Flask, Flask пишет "READY <порт>",
+// и только после этого открывается окно программы.
+app.whenReady().then(startFlask);
 
 app.on("window-all-closed", () => {
   app.quit();

@@ -216,28 +216,32 @@ def apply_profile():
                 raise ValueError("Выбранный титульный лист не найден.")
 
         input_name, input_path = save_upload(uploaded_file, ".docx", "document.docx")
-        validate_docx_file(input_path)
+        try:
+            validate_docx_file(input_path)
 
-        skip_title = request.form.get("skip_title") == "1"
-        if not title_path and not skip_title and not analyze_layout(Document(input_path))["title"]:
-            return jsonify({
-                "no_title": True,
-                "message": "Титульный лист в документе не найден. Создайте его на вкладке «Титульный лист» "
-                           "и выберите в списке, либо оформите документ без него.",
-            })
+            skip_title = request.form.get("skip_title") == "1"
+            if not title_path and not skip_title and not analyze_layout(Document(input_path))["title"]:
+                return jsonify({
+                    "no_title": True,
+                    "message": "Титульный лист в документе не найден. Создайте его на вкладке «Титульный лист» "
+                               "и выберите в списке, либо оформите документ без него.",
+                })
 
-        output_name = get_free_file_name(OUTPUTS_FOLDER, "formatted_" + input_name)
-        output_path = os.path.join(OUTPUTS_FOLDER, output_name)
-        result = check_and_format_document(input_path, profile_path, output_path, title_path)
+            output_name = get_free_file_name(OUTPUTS_FOLDER, "formatted_" + input_name)
+            output_path = os.path.join(OUTPUTS_FOLDER, output_name)
+            result = check_and_format_document(input_path, profile_path, output_path, title_path)
+        finally:
+            # исходный файл больше не нужен: результат уже сохранён в outputs
+            os.remove(input_path)
 
         warnings = result["warnings"]
         if skip_title:
             warnings = [w for w in warnings if not w.startswith("Титульный лист не найден")]
 
-        if result["is_gost"]:
+        if result["is_correct"]:
             return jsonify({
-                "gost": True,
-                "message": "Документ оформлен по ГОСТу. Исправления не требуются.",
+                "correct": True,
+                "message": "Документ уже оформлен по профилю «" + result["profile_name"] + "». Исправления не требуются.",
                 "warnings": warnings,
             })
 
@@ -246,9 +250,12 @@ def apply_profile():
         if not size_is_ok:
             message = "Внимание: размер файла " + str(round(size_mb, 1)) + " МБ, это больше допустимых 5 МБ."
 
+        # имя для скачивания: как у исходного файла, только с пометкой "оформлено"
+        download_name = "оформлено_" + os.path.basename(uploaded_file.filename)
         return jsonify({
-            "gost": False,
+            "correct": False,
             "url": url_for("static", filename=output_name),
+            "download_name": download_name,
             "criteria": [{"n": n, "name": CRITERIA_NAMES[n]} for n in result["failed"]],
             "title_inserted": result["title_inserted"],
             "changes": result["changes"][:MAX_SHOWN_CHANGES],
@@ -306,8 +313,12 @@ def analyze_pptx():
             raise ValueError("Можно выбрать только файл с расширением .pptx.")
 
         input_name, input_path = save_upload(uploaded_file, ".pptx", "presentation.pptx")
-        validate_pptx_file(input_path)
-        return jsonify({"issues": analyze_presentation(input_path)})
+        try:
+            validate_pptx_file(input_path)
+            issues = analyze_presentation(input_path)
+        finally:
+            os.remove(input_path)  # презентацию только читаем, хранить её не нужно
+        return jsonify({"issues": issues})
     except ValueError as error:
         return jsonify({"error": str(error)}), 400
     except Exception:
