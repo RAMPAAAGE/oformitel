@@ -75,7 +75,10 @@ def copy_default_profiles():
             continue
         source_path = os.path.join(DEFAULT_PROFILES_FOLDER, file_name)
         destination_path = os.path.join(PROFILES_FOLDER, file_name)
-        if os.path.isfile(source_path) and not os.path.exists(destination_path):
+        # встроенные профили копируем при каждом запуске: если в новой версии
+        # программы их поправили (например, поля ГОСТ), у пользователя они тоже обновятся.
+        # Свои профили пользователь сохраняет под другими именами (profile_1.json и т.д.)
+        if os.path.isfile(source_path):
             shutil.copyfile(source_path, destination_path)
 
 
@@ -256,7 +259,10 @@ def apply_profile():
             "correct": False,
             "url": url_for("static", filename=output_name),
             "download_name": download_name,
-            "criteria": [{"n": n, "name": CRITERIA_NAMES[n]} for n in result["failed"]],
+            "criteria": [
+                {"n": n, "name": CRITERIA_NAMES[n], "details": result["details"].get(n, "")}
+                for n in result["failed"]
+            ],
             "title_inserted": result["title_inserted"],
             "changes": result["changes"][:MAX_SHOWN_CHANGES],
             "changes_total": len(result["changes"]),
