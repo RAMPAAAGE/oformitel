@@ -41,6 +41,8 @@ def build_backend():
         make_data_argument(os.path.join(ELECTRON_FOLDER, "build", "index.html"), "electron"),
         "--add-data",
         make_data_argument(os.path.join(ELECTRON_FOLDER, "build", "style.css"), "electron"),
+        "--add-data",
+        make_data_argument(os.path.join(ELECTRON_FOLDER, "build", "fonts"), os.path.join("electron", "fonts")),
         "app.py",
     ]
 

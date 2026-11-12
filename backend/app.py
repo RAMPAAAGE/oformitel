@@ -337,6 +337,12 @@ def style_sheet():
     return send_from_directory(TEMPLATES_FOLDER, "style.css")
 
 
+@app.get("/fonts/<path:file_name>")
+def font_file(file_name):
+    # шрифты лежат внутри программы, чтобы она выглядела одинаково и без интернета
+    return send_from_directory(os.path.join(TEMPLATES_FOLDER, "fonts"), file_name)
+
+
 @app.post("/apply")
 def apply_profile():
     try:
