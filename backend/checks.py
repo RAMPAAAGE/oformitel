@@ -1,7 +1,6 @@
-# Проверки документа. Каждая функция check_... проверяет один критерий
-# и возвращает True (всё правильно) или False (критерий нарушен).
-# Здесь документ только читается, ничего не меняется.
+import re
 
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.text.paragraph import Paragraph
 
@@ -9,21 +8,31 @@ from layout import all_paragraphs, analyze_layout, get_role
 from profiles import DOCUMENT_TYPES
 from punctuation import BIBLIO, apply_edits, find_edits, get_nodes, heading_edit, make_changes, spell_words
 from word_helpers import (
-    before, break_before, clean, get_bold, get_font, get_indent, get_runs, get_size, get_spacing,
-    has_num, has_picture, has_sect, is_caption, page_breaks, prev_par, section_number,
+    before, break_before, clean, get_alignment, get_space, has_decoration, has_tag, get_bold, get_font, get_indent, get_runs, get_size, get_spacing,
+    has_num, has_picture, has_sect, is_caption, is_table_caption, page_breaks, prev_par, section_number,
     split_dots, split_space_page, starts_with_break,
 )
 
-# у каких абзацев проверяем межстрочный интервал
-SPACING_ROLES = ["body", "heading", "list", "center"]
+SPACING_ROLES = ["body", "heading", "list", "center", "caption"]
+JUSTIFY_ROLES = ["body", "list"]
+ZERO_SPACE_ROLES = ["body", "list", "heading", "caption"]
 
 
-# --- 1-5: поля, шрифт, размер, интервал, отступ ---
+def is_a4(section):
+    # A4 - 21 × 29,7 см; альбомные страницы (широкие таблицы) тоже подходят
+    try:
+        sizes = sorted([section.page_width.cm, section.page_height.cm])
+    except (ValueError, TypeError, AttributeError):
+        return False
+    return abs(sizes[0] - 21) < 0.1 and abs(sizes[1] - 29.7) < 0.1
+
 
 def check_margins(doc, profile):
     want = [profile["margin_top_cm"], profile["margin_bottom_cm"],
             profile["margin_left_cm"], profile["margin_right_cm"]]
     for section in doc.sections:
+        if not is_a4(section):
+            return False
         try:
             got = [section.top_margin.cm, section.bottom_margin.cm,
                    section.left_margin.cm, section.right_margin.cm]
@@ -63,8 +72,40 @@ def check_spacing(doc, profile, layout):
     return True
 
 
+def check_alignment(doc, layout):
+    for p in doc.paragraphs:
+        if get_role(p, layout) in JUSTIFY_ROLES and get_alignment(p) != WD_ALIGN_PARAGRAPH.JUSTIFY:
+            return False
+    return True
+
+
+def check_paragraph_spaces(doc, layout):
+    # интервалы перед и после абзаца - 0; отступы слева и справа - 0 (у списков отступ делает сам Word)
+    for p in doc.paragraphs:
+        role = get_role(p, layout)
+        if role not in ZERO_SPACE_ROLES:
+            continue
+        names = ["space_before", "space_after"]
+        if role != "list":
+            names += ["left_indent", "right_indent"]
+        for name in names:
+            value = get_space(p, name)
+            if name.startswith("space") and value is None:
+                return False
+            if value is not None and abs(value) > 0.5:
+                return False
+    return True
+
+
+def check_decoration(doc, layout):
+    for p in all_paragraphs(doc, layout, True):
+        for run in get_runs(p):
+            if run.text.strip() and has_decoration(run, p):
+                return False
+    return True
+
+
 def check_indent(doc, profile, layout):
-    # красная строка нужна только обычному тексту
     for p in doc.paragraphs:
         if get_role(p, layout) == "body":
             if abs(get_indent(p) - profile["first_line_indent_cm"]) > 0.1:
@@ -72,7 +113,6 @@ def check_indent(doc, profile, layout):
     return True
 
 
-# --- 6: нумерация страниц ---
 # Правильно: на титульном листе и в оглавлении номера нет, со введения - есть.
 
 def is_typed_num(p):
@@ -111,7 +151,6 @@ def is_page_code(text):
 
 
 def has_page_field(sections, i):
-    # есть ли номер страницы в нижнем колонтитуле раздела i.
     # Колонтитул "как в предыдущем разделе" - тогда смотрим предыдущий раздел
     while i > 0 and sections[i].footer.is_linked_to_previous:
         i -= 1
@@ -129,7 +168,7 @@ def has_page_field(sections, i):
 
 def check_numbers(doc, layout):
     sections = doc.sections
-    intro = layout["intro"]
+    intro = layout["first_section"]
     if find_typed_nums(doc, layout):
         return False  # номера набраны руками - после нумерации будет два номера
 
@@ -159,12 +198,10 @@ def check_numbers(doc, layout):
     return True
 
 
-# --- 7: точки в оглавлении ---
 # Правильно: между названием и номером стоит табуляция с точками (её делает сам Word),
 # а не точки, набранные руками.
 
 def has_leader(p):
-    # есть ли у абзаца табуляция с точками
     if 'w:leader="dot"' in p._p.xml:
         return True
     return p.style is not None and 'w:leader="dot"' in p.style.element.xml
@@ -184,10 +221,7 @@ def check_toc(doc, layout):
     return True
 
 
-# --- 8: подписи к картинкам ---
-
 def caption_below(p):
-    # есть ли подпись в ближайшем непустом абзаце под картинкой
     for element in p._p.itersiblings(qn("w:p")):
         next_p = Paragraph(element, p._parent)
         if next_p.text.strip() != "":
@@ -214,10 +248,46 @@ def check_captions(doc, layout):
     return True
 
 
-# --- 9: каждая тема с новой страницы и жирным шрифтом ---
+def text_tables(doc, layout):
+    # таблицы основного текста: таблицу на титульном листе (её делают для разметки) не считаем
+    title = set(layout["title_el"])
+    result = []
+    for table in doc.tables:
+        on_title = False
+        for element in table._tbl.itersiblings():
+            if element in title:
+                on_title = True
+                break
+        if not on_title:
+            result.append(table)
+    return result
+
+
+def has_table_caption(table):
+    # подпись над таблицей: "Таблица 1 - Название" или "Таблица 1" и название строкой ниже
+    found = 0
+    for element in table._tbl.itersiblings(preceding=True):
+        if element.tag != qn("w:p"):
+            return False
+        text = Paragraph(element, table._parent).text.strip()
+        if text == "":
+            continue
+        if is_table_caption(text):
+            return True
+        found += 1
+        if found == 2:
+            return False
+    return False
+
+
+def check_table_captions(doc, layout):
+    for table in text_tables(doc, layout):
+        if not has_table_caption(table):
+            return False
+    return True
+
 
 def new_page(p):
-    # начинается ли абзац с новой страницы
     if break_before(p) or starts_with_break(p):
         return True
     for element in reversed(before(p)):
@@ -230,8 +300,7 @@ def new_page(p):
 
 
 def title_runs(p):
-    # куски текста заголовка. Если после названия в том же абзаце идёт текст,
-    # берём только куски до первого переноса строки
+    # если в абзаце после названия идёт текст, берём куски до первого переноса строки
     runs = get_runs(p)
     if "\n" not in p.text:
         return runs
@@ -257,11 +326,8 @@ def check_themes(layout):
     return True
 
 
-# --- 10: пунктуация ---
-
 def punct_work(doc, layout, apply=False):
-    # идёт по абзацам и находит правки; если apply=True - сразу вносит их в документ.
-    # Возвращает список изменений "было -> стало" для показа пользователю
+    # apply=True - сразу вносит правки. Возвращает список «было -> стало»
     changes = []
     biblio = False  # список литературы оформляется по своим правилам, его не трогаем
     prev_dot = None
@@ -291,15 +357,13 @@ def check_punct(doc, layout):
     return punct_work(doc, layout) == []
 
 
-# --- пояснения к исправлениям ---
-
 def cm_text(value):
     # 2.0 -> "2", 1.5 -> "1,5"
     return ("%g" % round(value, 2)).replace(".", ",")
 
 
 def margins_description(doc, profile):
-    # что именно не так с полями: "левое 2 → 3 см, правое 2 → 1,5 см"
+    # например: "левое 2 → 3 см, правое 2 → 1,5 см"
     section = doc.sections[0]
     sides = [
         ("верхнее", section.top_margin, profile["margin_top_cm"]),
@@ -308,6 +372,8 @@ def margins_description(doc, profile):
         ("правое", section.right_margin, profile["margin_right_cm"]),
     ]
     parts = []
+    if not is_a4(section):
+        parts.append("формат листа → A4")
     for name, real, needed in sides:
         if real is None:
             continue
@@ -316,17 +382,14 @@ def margins_description(doc, profile):
     return ", ".join(parts)
 
 
-# --- предупреждения (их программа не исправляет, а только сообщает) ---
-
 def structure_warnings(doc, profile):
-    # есть ли обязательные части работы. Текст за автора программа не придумывает
     document_type = profile.get("document_type", "free")
     rules = profile.get("structure") or DOCUMENT_TYPES.get(document_type, DOCUMENT_TYPES["free"])
     layout = analyze_layout(doc)
     warnings = []
 
     if rules.get("title_page") and not layout["title"]:
-        warnings.append("В документе не найден обязательный титульный лист.")
+        warnings.append("Не найден обязательный титульный лист. Создайте его на вкладке «Титульный лист».")
     if rules.get("toc") and not layout["toc"]:
         warnings.append("В документе не найдено обязательное оглавление.")
 
@@ -341,7 +404,6 @@ def structure_warnings(doc, profile):
 
 
 def spell_warning(doc):
-    # слова, которые Word подчеркнул красным; если пометок нет - ничего не пишем
     words = []
     for word in spell_words(doc):
         if word not in words:
@@ -355,11 +417,53 @@ def spell_warning(doc):
     return ["Word подчеркнул красной линией слова: " + shown + more + ". Проверьте их правописание вручную."]
 
 
+def referenced_numbers(text, word_start):
+    # номера после "рис." / "рисунке" / "табл." и т.п.: "рис. 2", "рис. 1, 2 и 4", "рис. 3–5"
+    numbers = set()
+    pattern = word_start + r"[а-яё]*\.?\s*(\d+(?:\s*(?:,|и|–|—|-)\s*\d+)*)"
+    for match in re.finditer(pattern, text):
+        parts = re.split(r"\s*(,|и)\s*", match.group(1))
+        for part in parts:
+            ends = re.split(r"\s*[–—-]\s*", part)
+            if ends[0].isdigit() and ends[-1].isdigit():
+                for n in range(int(ends[0]), int(ends[-1]) + 1):
+                    numbers.add(n)
+    return numbers
+
+
+def missing_references(doc, layout):
+    # на каждый рисунок и таблицу в тексте должна быть ссылка: "(рис. 2)", "в таблице 1"
+    text = ""
+    for p in doc.paragraphs:
+        if get_role(p, layout) in JUSTIFY_ROLES:
+            text += p.text.lower() + "\n"
+    pictures = 0
+    for p in doc.paragraphs:
+        if p._p not in layout["title_el"] and has_picture(p):
+            pictures += 1
+    on_pictures = referenced_numbers(text, "рис")
+    on_tables = referenced_numbers(text, "табл")
+    missing = []
+    for n in range(1, pictures + 1):
+        if n not in on_pictures:
+            missing.append("рис. " + str(n))
+    for n in range(1, len(text_tables(doc, layout)) + 1):
+        if n not in on_tables:
+            missing.append("таблица " + str(n))
+    return missing
+
+
 def find_warnings(doc):
     layout = analyze_layout(doc)
     warnings = []
-    if not layout["title"]:
-        warnings.append("Титульный лист не найден. Создайте его на вкладке «Титульный лист» и вставьте в документ.")
-    if layout["intro"] is None:
-        warnings.append("Раздел «Введение» не найден: номера страниц поставлены на все страницы, кроме первой.")
+    if layout["first_section"] is None:
+        warnings.append("Не найден первый раздел работы (например, «Введение»): "
+                        "номера страниц поставлены на все страницы, кроме первой.")
+    if has_tag(doc.element.body, "w:object"):
+        warnings.append("В документе есть объект из другой программы (например, таблица Excel). "
+                        "Таблицы нужно делать средствами Word: «Вставка» → «Таблица».")
+    missing = missing_references(doc, layout)
+    if missing:
+        warnings.append("В тексте не найдены ссылки на: " + ", ".join(missing)
+                        + ". На каждый рисунок и таблицу нужна ссылка, например «(рис. 1)».")
     return warnings

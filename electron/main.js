@@ -1,9 +1,8 @@
-const { app, BrowserWindow, dialog } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const { spawn } = require("child_process");
+const fs = require("fs");
 const path = require("path");
 
-// Electron - это "окно" программы. Вся работа с документами идёт в Python (Flask),
-// а окно просто показывает его страницу по адресу http://127.0.0.1:<порт>.
 
 let flaskProcess;
 let applicationIsClosing = false;
@@ -114,6 +113,55 @@ function checkServerOutput(data) {
 }
 
 
+// Готовые файлы сохраняются сразу в «Загрузки», без окна «Сохранить как».
+// Открыть или показать в папке можно только файл, который сохранила сама программа.
+const savedFiles = new Set();
+
+function freeFilePath(folder, fileName) {
+  const extension = path.extname(fileName);
+  const name = path.basename(fileName, extension);
+  let filePath = path.join(folder, fileName);
+  let number = 2;
+  while (fs.existsSync(filePath)) {
+    filePath = path.join(folder, name + " (" + number + ")" + extension);
+    number += 1;
+  }
+  return filePath;
+}
+
+function saveDownloadsToFolder(window) {
+  window.webContents.session.on("will-download", (event, item) => {
+    // OFORMITEL_DOWNLOADS - другая папка для сохранения (нужно автотестам)
+    const folder = process.env.OFORMITEL_DOWNLOADS || app.getPath("downloads");
+    const filePath = freeFilePath(folder, item.getFilename());
+    item.setSavePath(filePath);
+    item.once("done", (doneEvent, state) => {
+      const saved = state === "completed";
+      if (saved) {
+        savedFiles.add(filePath);
+      }
+      window.webContents.send("file-saved", { saved: saved, path: filePath, name: path.basename(filePath) });
+    });
+  });
+}
+
+ipcMain.handle("open-file", (event, filePath) => {
+  if (!savedFiles.has(filePath)) {
+    return "Файл не найден";
+  }
+  // автотесты проверяют, что файл сохранён, но не открывают Word
+  if (process.env.OFORMITEL_DONT_OPEN) {
+    return "";
+  }
+  return shell.openPath(filePath);
+});
+
+ipcMain.handle("show-file", (event, filePath) => {
+  if (savedFiles.has(filePath)) {
+    shell.showItemInFolder(filePath);
+  }
+});
+
 function createWindow(port) {
   const window = new BrowserWindow({
     width: 1000,
@@ -124,9 +172,11 @@ function createWindow(port) {
     icon: path.join(__dirname, "build", "icon.png"),
     webPreferences: {
       contextIsolation: true,
+      preload: path.join(__dirname, "preload.js"),
     },
   });
 
+  saveDownloadsToFolder(window);
   window.loadURL("http://127.0.0.1:" + port);
 }
 

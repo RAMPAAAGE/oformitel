@@ -21,6 +21,7 @@
     },
     "files": [
       "main.js",
+      "preload.js",
       "package.json",
       "build/icon.png",
       "build_backend.js"

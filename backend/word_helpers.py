@@ -1,19 +1,12 @@
-# Маленькие помощники для работы с документом Word.
-#
-# Как устроен файл .docx внутри:
-#   документ - это XML, абзац - это тег w:p, кусок текста внутри абзаца - тег w:r (run).
-#   Один абзац может состоять из нескольких кусков с разным шрифтом,
-#   поэтому шрифт и размер мы проверяем у каждого куска.
-
 import os
 
+from docx.enum.dml import MSO_THEME_COLOR
 from docx.oxml.ns import qn
+from docx.shared import RGBColor
 from docx.text.run import Run
 
 MAX_DOCUMENT_SIZE_MB = 5
 
-
-# --- проверка файла ---
 
 def check_file_size(path, max_mb=MAX_DOCUMENT_SIZE_MB):
     # возвращает (размер в норме?, размер в мегабайтах)
@@ -31,8 +24,6 @@ def validate_docx_file(path):
     return True
 
 
-# --- работа с текстом ---
-
 def clean(text):
     # приводит название раздела к простому виду: "1. Введение:" -> "введение"
     text = text.strip().lower().rstrip(".:").strip()
@@ -43,7 +34,6 @@ def clean(text):
 
 
 def is_subsection(text):
-    # подраздел - это "1.1 Цели" или "2.3.1 Что-то"
     numbers = text.strip().split(" ")[0].rstrip(".").split(".")
     if len(numbers) < 2:
         return False
@@ -87,7 +77,6 @@ def split_space_page(text):
 
 
 def split_toc(text):
-    # делит строку оглавления на название и номер страницы
     text = text.strip()
     if "\t" in text:
         title, _, page = text.partition("\t")
@@ -99,22 +88,23 @@ def split_toc(text):
 
 
 def is_caption(text):
-    # подпись к картинке: "Рис. 1", "Рисунок 2" и т.п.
     t = text.strip().lower()
     return t.startswith(("рис.", "рисунок", "рис ", "рис("))
 
 
-# --- работа с XML абзаца ---
+def is_table_caption(text):
+    t = text.strip().lower()
+    return t.startswith(("таблица", "табл.", "табл "))
+
 
 def has_tag(element, tag_name):
-    # есть ли внутри элемента хотя бы один тег с таким именем
     for _ in element.iter(qn(tag_name)):
         return True
     return False
 
 
 def get_runs(p):
-    # все куски текста абзаца (в том числе внутри ссылок)
+    # p.runs не видит текст внутри гиперссылок, поэтому ищем w:r сами
     return [Run(r, p) for r in p._p.iter(qn("w:r"))]
 
 
@@ -123,7 +113,6 @@ def has_picture(p):
 
 
 def page_breaks(element):
-    # ручные разрывы страницы (Ctrl+Enter) внутри элемента
     result = []
     for br in element.iter(qn("w:br")):
         if br.get(qn("w:type")) == "page":
@@ -132,7 +121,6 @@ def page_breaks(element):
 
 
 def break_before(p):
-    # включена ли у абзаца галочка "с новой страницы"
     settings = p._p.pPr
     if settings is None:
         return False
@@ -141,7 +129,6 @@ def break_before(p):
 
 
 def starts_with_break(p):
-    # абзац начинается с ручного разрыва страницы
     for node in p._p.iter():
         if node.tag == qn("w:t") and (node.text or "").strip():
             return False
@@ -151,7 +138,6 @@ def starts_with_break(p):
 
 
 def get_sect(element):
-    # настройки раздела (sectPr), если абзац заканчивает раздел
     settings = element.find(qn("w:pPr"))
     if settings is None:
         return None
@@ -163,15 +149,13 @@ def has_sect(element):
 
 
 def style_name(p):
-    # название стиля абзаца маленькими буквами.
-    # У некоторых документов стиль указан, но в файле его нет - тогда p.style равен None
+    # бывает, что стиль указан, но в файле его нет - тогда p.style равен None
     if p.style is None:
         return ""
     return (p.style.name or "").lower()
 
 
 def has_num(p):
-    # абзац - пункт автоматического списка Word
     settings = p._p.pPr
     return settings is not None and settings.find(qn("w:numPr")) is not None
 
@@ -193,7 +177,6 @@ def is_top_heading(p):
 
 
 def before(p):
-    # все абзацы документа перед этим, по порядку
     result = []
     for element in p._p.getroottree().getroot().iter(qn("w:p")):
         if element is p._p:
@@ -203,7 +186,7 @@ def before(p):
 
 
 def section_number(p):
-    # номер раздела, в котором лежит абзац (считаем с нуля)
+    # считая с нуля
     count = 0
     for element in before(p):
         if has_sect(element):
@@ -212,14 +195,13 @@ def section_number(p):
 
 
 def prev_par(p):
-    # предыдущий абзац, если прямо перед этим стоит абзац (а не таблица)
+    # None, если перед абзацем таблица
     node = p._p.getprevious()
     if node is not None and node.tag == qn("w:p"):
         return node
     return None
 
 
-# --- чтение оформления ---
 # Если у текста не указан шрифт, он берётся из стиля абзаца,
 # а если и там нет - из стиля, на котором основан этот стиль, и так далее.
 
@@ -272,6 +254,15 @@ def get_spacing(p):
     return None
 
 
+def get_alignment(p):
+    try:
+        if p.alignment is not None:
+            return p.alignment
+        return from_style(p, lambda style: style.paragraph_format.alignment)
+    except (ValueError, TypeError):
+        return None
+
+
 def get_indent(p):
     try:
         indent = p.paragraph_format.first_line_indent
@@ -282,3 +273,54 @@ def get_indent(p):
     if indent is None:
         return 0.0
     return indent.cm
+
+
+def get_space(p, name):
+    # name - "space_before", "space_after", "left_indent" или "right_indent".
+    # None - значение нигде не указано явно
+    try:
+        value = getattr(p.paragraph_format, name)
+        if value is None:
+            value = from_style(p, lambda style: getattr(style.paragraph_format, name))
+    except (ValueError, TypeError):
+        return None
+    if value is None:
+        return None
+    return value.pt
+
+
+def is_colored(color):
+    try:
+        if color.rgb is not None:
+            return color.rgb != RGBColor(0, 0, 0)
+        # цвет темы без точного значения: чёрный только "основной текст"
+        return color.theme_color not in (None, MSO_THEME_COLOR.TEXT_1, MSO_THEME_COLOR.DARK_1)
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+
+def has_decoration(run, p):
+    # подчёркивание, выделение маркером или цветной текст - сам у текста или из стиля
+    try:
+        if run.font.highlight_color is not None:
+            return True
+        fonts = [run.font]
+        if run.style is not None:
+            fonts.append(run.style.font)
+        style = p.style
+        while style is not None:
+            fonts.append(style.font)
+            style = style.base_style
+    except (ValueError, TypeError):
+        return False
+    underline = None
+    for font in fonts:
+        if font.underline is not None:
+            underline = font.underline
+            break
+    if underline:
+        return True
+    for font in fonts:
+        if font.color.type is not None:
+            return is_colored(font.color)
+    return False

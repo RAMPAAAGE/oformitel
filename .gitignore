@@ -11,3 +11,5 @@ electron/dist/
 __pycache__/
 *.pyc
 electron/release/
+.DS_Store
+backend/my_templates/

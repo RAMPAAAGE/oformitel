@@ -37,7 +37,7 @@ h2 { margin: 0 0 22px; font-size: 23px; letter-spacing: -0.02em; }
   cursor: pointer;
 }
 .tab-button.active { color: var(--blue-dark); border-bottom-color: var(--blue); }
-/* при наведении вкладка синяя, а текст белый - иначе синий текст сливается с синим фоном */
+/* синий текст на синем фоне не читается */
 .tab-button:hover { background: var(--blue-dark); color: #fff; }
 .tab-page { display: none; }
 .tab-page.active { display: block; }
@@ -104,6 +104,13 @@ button:disabled { background: #8da8ca; cursor: wait; }
 button.gray { margin-top: 10px; background: #eef1f5; color: #344054; }
 button.gray:hover { background: #e1e6ee; }
 
+.person-list { display: grid; gap: 8px; }
+.person-row { display: flex; gap: 8px; }
+button.remove-person { width: 44px; flex: 0 0 44px; margin: 0; background: #eef1f5; color: #344054; font-size: 20px; }
+button.remove-person:hover { background: #f6d6d6; color: #9b2c2c; }
+button.add-person { width: auto; min-height: 36px; margin-top: 8px; padding: 6px 14px; background: #eef1f5; color: var(--blue-dark); }
+button.add-person:hover { background: #e1e6ee; }
+
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 18px; }
 .notice { margin: 0 0 18px; padding: 13px 15px; border-left: 4px solid; line-height: 1.45; }
 .success { color: #17603b; background: #eaf7ef; border-color: #36a269; }
@@ -126,10 +133,156 @@ th { color: #667085; font-size: 12px; letter-spacing: 0.05em; }
 .changes .new { color: #17603b; }
 .slide-number { color: var(--blue-dark); font-weight: 750; white-space: nowrap; }
 
+button.danger { color: #9b2c2c; }
+button.danger:hover { background: #f6d6d6; }
+.button-link {
+  display: inline-block;
+  margin-top: 16px;
+  padding: 11px 16px;
+  border-radius: 7px;
+  background: var(--blue);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+}
+.button-link:hover { background: var(--blue-dark); }
+.go-tab { color: var(--blue-dark); font-weight: 650; }
+.result-block .go-tab { margin-top: 8px; font-size: 14px; }
+
+.steps ol { margin: 0; padding-left: 20px; color: #344054; line-height: 1.55; }
+.steps li + li { margin-top: 6px; }
+
+/* предпросмотр титульного листа: уменьшенный лист A4 */
+.title-layout { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 28px; align-items: start; }
+.sheet {
+  position: sticky;
+  top: 20px;
+  display: flex;
+  flex-direction: column;
+  aspect-ratio: 210 / 297;
+  padding: 18px 16px;
+  border: 1px solid var(--line);
+  box-shadow: 0 4px 14px rgba(32, 39, 51, 0.12);
+  background: #fff;
+  color: #000;
+  font-family: "Times New Roman", serif;
+  font-size: 7px;
+  line-height: 1.2;
+}
+.sheet p { margin: 0; overflow-wrap: anywhere; }
+.sheet-top { text-align: center; font-weight: 700; }
+.sheet-title { margin: auto 0 !important; text-align: center; font-weight: 700; font-size: 8px; }
+.sheet-people { margin-left: 46%; text-align: left; }
+.sheet-city { margin-top: 14px !important; text-align: center; font-weight: 700; }
+
+/* группа участников и глава шаблона - рамка вокруг связанных полей */
+.group { margin-top: 12px; padding: 4px 16px 14px; border: 1px dashed #b9c2d0; border-radius: 8px; }
+.group .grid label, .group > label { font-weight: 600; font-size: 14px; }
+.chapter { padding-top: 14px; }
+button.remove-group { width: auto; min-height: 30px; margin: 10px 0 0; padding: 4px 12px; background: #eef1f5; color: #9b2c2c; font-size: 13px; }
+button.remove-group:hover, button.remove-chapter:hover { background: #f6d6d6; color: #9b2c2c; }
+button.remove-chapter { width: 44px; flex: 0 0 44px; margin: 0; background: #eef1f5; color: #344054; font-size: 20px; }
+
+/* галочки конструктора шаблона */
+.checks { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 4px; }
+label.check { display: inline-flex; align-items: center; gap: 8px; margin: 0; font-weight: 400; cursor: pointer; }
+label.check input { width: 18px; min-height: 18px; height: 18px; margin: 0; }
+.type-note { margin-top: 10px; max-width: 760px; line-height: 1.45; white-space: pre-line; }
+.chapter input.chapter-name { font-weight: 650; }
+.chapter .subsections { margin: 8px 0 0 24px; }
+.chapter .add-subsection { margin-left: 24px; }
+
+/* подсказка при наведении: значок «?» и всплывающий текст */
+.tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 4px;
+  border-radius: 50%;
+  background: #e1e6ee;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: help;
+  vertical-align: 1px;
+}
+.tip:hover::after, .tip.force::after {
+  content: attr(data-tip);
+  position: absolute;
+  z-index: 10;
+  left: 50%;
+  top: 26px;
+  width: 300px;
+  transform: translateX(-50%);
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #202733;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.45;
+  white-space: pre-line;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+}
+
+/* общий выбор требований конференции над вкладками */
+.profile-bar { margin: 0 0 20px; padding: 14px 18px 16px; background: #fff; border: 1px solid var(--line); border-radius: 10px; }
+.profile-bar label { margin: 0 0 8px; }
+.profile-bar-row { display: flex; align-items: center; gap: 16px; }
+.profile-bar-row select { flex: 1 1 auto; }
+.profile-bar-row .go-tab { flex: 0 0 auto; font-size: 14px; }
+.profile-bar label[for="template_type"] { margin-top: 14px; }
+.type-heading { margin: 0 0 4px; font-size: 18px; }
+
+/* «нет титульного листа»: две кнопки рядом */
+.choice p { margin: 0 0 12px; }
+.choice button { width: auto; margin: 0 8px 0 0; padding: 10px 18px; }
+
+/* сообщение «файл сохранён» внизу окна */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: calc(100% - 32px);
+  padding: 12px 14px 12px 18px;
+  transform: translateX(-50%);
+  border-radius: 10px;
+  background: #202733;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+.toast[hidden] { display: none; }
+.toast button { width: auto; min-height: 36px; margin: 0; padding: 6px 12px; white-space: nowrap; }
+
+.profile-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+.profile-head h2 { margin: 0; }
+.profile-head button { width: auto; margin: 0; padding: 10px 16px; }
+
+/* предпросмотр оглавления в конструкторе шаблона */
+.outline { position: sticky; top: 20px; padding: 18px 18px 14px; border: 1px solid var(--line); border-radius: 8px; background: #fbfcfd; }
+.outline-label { margin: 0 0 10px; font-weight: 700; }
+.outline ol { margin: 0 0 12px; padding: 0; list-style: none; font-family: "Times New Roman", serif; font-size: 15px; line-height: 1.5; }
+.outline li { padding: 2px 0; border-bottom: 1px dotted #c5cad2; }
+.outline .outline-sub { padding-left: 18px; }
+.outline .outline-service { color: var(--muted); font-style: italic; }
+
+.inline-row { display: flex; gap: 8px; }
+.inline-row button { width: auto; margin: 0; padding: 10px 16px; white-space: nowrap; }
+
 @media (max-width: 620px) {
   main { width: min(100% - 24px, 940px); padding-top: 28px; }
   .card { padding: 20px; }
   .grid { grid-template-columns: 1fr; }
+  .profile-bar-row { flex-direction: column; align-items: stretch; gap: 8px; }
+  .title-layout { grid-template-columns: 1fr; }
+  .sheet { position: static; width: 220px; margin: 0 auto; }
   .tabs { gap: 16px; overflow-x: auto; }
   .tab-button { flex: 0 0 auto; }
 }

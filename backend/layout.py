@@ -1,24 +1,23 @@
-# "Карта документа": программа находит, где титульный лист, оглавление,
-# введение и заголовки разделов. От этого зависит, какие правила применять к абзацу.
-# Например, красная строка нужна обычному тексту, но не нужна заголовку.
-
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 from word_helpers import (
-    break_before, clean, has_picture, has_sect, is_caption, is_heading_style, is_list,
+    break_before, clean, has_picture, has_sect, is_caption, is_heading_style, is_list, is_table_caption,
     is_subsection, is_toc_style, is_top_heading, page_breaks, split_toc,
 )
 
 KNOWN_TITLES = [
     "оглавление", "содержание", "введение", "заключение",
     "список литературы", "список использованных источников", "литература",
+    "приложение", "приложения",
+    # разделы бизнес-плана («Шаг в бизнес»)
+    "описание бизнес-идеи", "анализ состояния рынка", "ценностное предложение и анализ целевой аудитории",
+    "бизнес-модель", "операционный план", "финансовая модель",
 ]
 TOC_NAMES = ["оглавление", "содержание"]
-TITLE_LIMIT = 40  # титульный лист ищем только среди первых 40 абзацев
+TITLE_LIMIT = 80  # титульный лист ищем только среди первых 80 абзацев (с пустыми строками)
 
 
 def find_toc_intro(paragraphs):
-    # номера абзацев "Оглавление" и "Введение" (или None, если их нет)
     toc = None
     intro = None
     for i, p in enumerate(paragraphs):
@@ -54,13 +53,17 @@ def find_title(paragraphs, toc, intro):
 
 
 def find_toc_entries(paragraphs, toc, intro):
-    # строки оглавления: всё между словом "Оглавление" и "Введением"
     end = intro
     if end is None and toc is not None:
-        # введения нет - оглавление кончается на первом разрыве страницы
+        # введения нет - оглавление кончается на первом разрыве страницы, разрыве раздела
+        # (его ставит сама программа при нумерации) или на первом заголовке Word
         for i in range(toc + 1, len(paragraphs)):
-            if page_breaks(paragraphs[i]._p) or break_before(paragraphs[i]):
+            p = paragraphs[i]
+            if page_breaks(p._p) or break_before(p) or is_heading_style(p):
                 end = i
+                break
+            if has_sect(p._p):
+                end = i + 1
                 break
     result = []
     for i, p in enumerate(paragraphs):
@@ -70,7 +73,6 @@ def find_toc_entries(paragraphs, toc, intro):
 
 
 def get_toc_titles(entries):
-    # названия разделов из оглавления (без подразделов вроде "1.1")
     titles = []
     for p in entries:
         raw = split_toc(p.text)[0]
@@ -111,7 +113,6 @@ def word_beginnings(titles):
 
 
 def shares_word(text, beginnings):
-    # есть ли в строке слово, которое начинается так же, как слово из оглавления
     for word in clean(text).split():
         if len(word) >= 5 and word[:5] in beginnings:
             return True
@@ -147,13 +148,24 @@ def find_themes(paragraphs, title_el, toc_el, toc_titles, intro):
                 themes.append(p)
                 added += 1
 
-    # возвращаем в том порядке, в каком заголовки стоят в документе
     chosen = [p._p for p in themes]
     return [p for p in paragraphs if p._p in chosen]
 
 
+def find_first_section(themes, intro, paragraphs, toc, title):
+    # раздел, с которого начинается нумерация страниц: обычно «Введение»,
+    # а в бизнес-плане его нет - тогда первый раздел после оглавления
+    if intro is not None:
+        return paragraphs[intro]
+    if toc is None and not title:
+        return None
+    for p in themes:
+        if clean(p.text) not in TOC_NAMES:
+            return p
+    return None
+
+
 def analyze_layout(doc):
-    # главная функция файла: строит карту документа
     paragraphs = list(doc.paragraphs)
     toc, intro = find_toc_intro(paragraphs)
     title = find_title(paragraphs, toc, intro)
@@ -163,6 +175,7 @@ def analyze_layout(doc):
     toc_el = [p._p for p in toc_entries]
     themes = find_themes(paragraphs, title_el, toc_el, get_toc_titles(toc_entries), intro)
     return {
+        "first_section": find_first_section(themes, intro, paragraphs, toc, title),
         "title": title,
         "title_el": title_el,
         "toc": toc_entries,
@@ -174,7 +187,6 @@ def analyze_layout(doc):
 
 
 def get_role(p, layout):
-    # роль абзаца: от неё зависит, какие правила к нему применять
     if p._p in layout["title_el"]:
         return "title"
     has_text = p.text.strip() != ""
@@ -188,13 +200,14 @@ def get_role(p, layout):
         return "heading"
     if is_list(p):
         return "list"
+    if len(p.text) < 150 and (is_caption(p.text) or is_table_caption(p.text)):
+        return "caption"
     if p.alignment in (WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.RIGHT):
         return "center"
     return "body"
 
 
 def table_paragraphs(table):
-    # абзацы внутри таблицы (и внутри таблиц, вложенных в неё)
     result = []
     for row in table.rows:
         for cell in row.cells:
@@ -205,7 +218,6 @@ def table_paragraphs(table):
 
 
 def all_paragraphs(doc, layout, with_title):
-    # все абзацы документа вместе с таблицами; титульный лист - по желанию
     result = []
     for p in doc.paragraphs:
         if with_title or p._p not in layout["title_el"]:

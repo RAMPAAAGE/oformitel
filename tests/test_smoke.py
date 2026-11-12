@@ -6,7 +6,8 @@ import tempfile
 import unittest
 
 from docx import Document
-from docx.shared import Cm, Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import Cm, Pt, RGBColor
 from pptx import Presentation
 
 
@@ -16,11 +17,19 @@ sys.path.insert(0, BACKEND_FOLDER)
 
 os.environ["OFORMITEL_DATA_FOLDER"] = tempfile.mkdtemp(prefix="oformitel-tests-")
 
-from app import OUTPUTS_FOLDER, PROFILES_FOLDER, app  # noqa: E402
+from app import OUTPUTS_FOLDER, PROFILES_FOLDER, app, copy_default_profiles  # noqa: E402
+from profiles import create_profile  # noqa: E402
+from template import WORK_TYPES, default_plan  # noqa: E402
 from engine import check_and_format_document  # noqa: E402
 from fixes import fix_toc  # noqa: E402
+from checks import missing_references  # noqa: E402
 from layout import analyze_layout  # noqa: E402
 from pptx_engine import analyze_presentation  # noqa: E402
+
+
+def output_file(url):
+    # "/download/formatted_x.docx?name=..." -> "formatted_x.docx"
+    return os.path.basename(url.split("?")[0])
 
 
 def make_docx():
@@ -98,10 +107,13 @@ class SmokeTests(unittest.TestCase):
             data={
                 "organization": "Тестовая организация",
                 "work_title": "Проверочная работа",
-                "participants": "Иванов И. И.",
-                "supervisor": "Петров П. П.",
+                "group_0_who": "ученик 10 класса",
+                "group_0_name": "Иванов И. И.",
+                "supervisor_position": "учитель",
+                "supervisor_name": "Петров П. П.",
                 "city": "Москва",
                 "year": "2026",
+                "profile_file": "01_inzhenery_budushchego.json",
             },
         )
 
@@ -135,7 +147,7 @@ class SmokeTests(unittest.TestCase):
             "margin_right_cm": "1.4",
             "document_type": "research",
         }
-        response = self.client.post("/new_profile", data=profile_values)
+        response = self.client.post("/save_profile", data=dict(profile_values, profile_file=""))
         self.assertEqual(response.status_code, 302)
 
         created_profiles = []
@@ -169,7 +181,7 @@ class SmokeTests(unittest.TestCase):
         self.assertTrue(any("обязательный титульный лист" in warning for warning in result["warnings"]))
         self.assertTrue(any("обязательное оглавление" in warning for warning in result["warnings"]))
 
-        output_name = os.path.basename(result["url"])
+        output_name = output_file(result["url"])
         output = Document(os.path.join(OUTPUTS_FOLDER, output_name))
         section = output.sections[0]
         self.assertAlmostEqual(section.top_margin.cm, 1.1, places=1)
@@ -185,7 +197,7 @@ class SmokeTests(unittest.TestCase):
 
     def test_invalid_custom_profile_values_are_rejected(self):
         response = self.client.post(
-            "/new_profile",
+            "/save_profile",
             data={
                 "name": "Невалидный профиль",
                 "font_name": "Arial",
@@ -211,6 +223,232 @@ class SmokeTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.get_json()["issues"]), 1)
+
+    def test_title_page_has_each_participant_on_own_line(self):
+        response = self.client.post(
+            "/create_title_page",
+            data={
+                "organization": "Тестовая организация",
+                "work_title": "Проверочная работа",
+                "group_0_who": "ученики 10 класса",
+                "group_0_school": "Школа № 1",
+                "group_0_name": ["Иванов И. И.", "", "Сидоров С. С."],
+                "group_3_who": "ученица 9 класса",
+                "group_3_name": "Петрова Е. Е.",
+                "supervisor_position": ["учитель физики", "учитель химии"],
+                "supervisor_name": ["Петров П. П.", "Смирнова А. А."],
+                "city": "Москва",
+                "year": "2026",
+                "profile_file": "01_inzhenery_budushchego.json",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        file_path = os.path.join(OUTPUTS_FOLDER, response.get_json()["file"])
+        lines = [paragraph.text for paragraph in Document(file_path).paragraphs]
+        start = lines.index("Участники:")
+        self.assertEqual(lines[start:start + 12], [
+            "Участники:", "ученики 10 класса", "Школа №\u00a01", "Иванов И. И.", "Сидоров С. С.",
+            "ученица 9 класса", "Петрова Е. Е.", "",
+            "Научные руководители:", "учитель физики", "Петров П. П.", "учитель химии",
+        ])
+
+    def test_justify_and_table_caption_are_fixed(self):
+        document = Document()
+        document.add_paragraph("Обычный абзац текста, выровненный по левому краю (табл. 1).")
+        table = document.add_table(rows=2, cols=2)
+        table.cell(0, 0).text = "Ячейка"
+        with tempfile.TemporaryDirectory() as folder:
+            source = os.path.join(folder, "source.docx")
+            result = os.path.join(folder, "result.docx")
+            document.save(source)
+            profile = os.path.join(PROFILES_FOLDER, "01_inzhenery_budushchego.json")
+
+            report = check_and_format_document(source, profile, result)
+
+            self.assertIn(11, report["failed"])
+            self.assertIn(12, report["failed"])
+            fixed = Document(result)
+            self.assertEqual(fixed.paragraphs[0].alignment, WD_ALIGN_PARAGRAPH.JUSTIFY)
+            self.assertEqual(fixed.paragraphs[1].text, "Таблица 1")
+            self.assertEqual(check_and_format_document(result, profile, result + "2")["failed"], [])
+
+    def test_missing_reference_to_picture_is_reported(self):
+        document = Document()
+        document.add_paragraph("Текст без ссылки на таблицу.")
+        document.add_paragraph("Таблица 1 - Результаты")
+        document.add_table(rows=1, cols=1)
+
+        self.assertEqual(missing_references(document, analyze_layout(document)), ["таблица 1"])
+
+    def test_builtin_profile_can_be_edited_and_reset(self):
+        values = {
+            "profile_file": "02_gost_7_32.json",
+            "name": "ГОСТ (мой)",
+            "font_name": "Times New Roman",
+            "font_size_pt": "12",
+            "line_spacing": "1.5",
+            "first_line_indent_cm": "1.25",
+            "margin_top_cm": "2",
+            "margin_bottom_cm": "2",
+            "margin_left_cm": "3",
+            "margin_right_cm": "1.5",
+            "document_type": "research",
+        }
+        path = os.path.join(PROFILES_FOLDER, "02_gost_7_32.json")
+
+        self.assertEqual(self.client.post("/save_profile", data=values).status_code, 302)
+        with open(path, encoding="utf-8") as file:
+            self.assertEqual(json.load(file)["font_size_pt"], 12)
+        copy_default_profiles()
+        with open(path, encoding="utf-8") as file:
+            self.assertEqual(json.load(file)["font_size_pt"], 12)
+
+        self.assertEqual(self.client.post("/reset_profile", data={"profile_file": "02_gost_7_32.json"}).status_code, 302)
+        with open(path, encoding="utf-8") as file:
+            self.assertEqual(json.load(file)["font_size_pt"], 14)
+
+        self.assertEqual(self.client.post("/delete_profile", data={"profile_file": "02_gost_7_32.json"}).status_code, 400)
+        self.assertTrue(os.path.isfile(path))
+
+    def test_new_profile_is_created_and_selected(self):
+        before = set(os.listdir(PROFILES_FOLDER))
+        response = self.client.post("/save_profile", data={
+            "profile_file": "", "name": "Моя конференция", "font_name": "Times New Roman", "font_size_pt": "14",
+            "line_spacing": "1.5", "first_line_indent_cm": "1.25", "margin_top_cm": "2", "margin_bottom_cm": "2",
+            "margin_left_cm": "3", "margin_right_cm": "1.5", "document_type": "research",
+        })
+        created = set(os.listdir(PROFILES_FOLDER)) - before
+        self.assertEqual(len(created), 1)
+        new_file = created.pop()
+        self.assertIn("select=" + new_file, response.headers["Location"])
+
+        page = self.client.get(response.headers["Location"]).get_data(as_text=True)
+        self.assertIn("Профиль «Моя конференция» создан и выбран.", page)
+        self.assertIn('value="' + new_file + '">Моя конференция', page)
+        os.remove(os.path.join(PROFILES_FOLDER, new_file))
+
+    def test_my_template_is_saved_listed_and_deleted(self):
+        plan = default_plan("research")
+        plan["chapters"] = [{"name": "Компьютерные игры", "subsections": ["История игр"]}]
+        response = self.client.post("/save_my_template", data={"name": "Про игры", "plan": json.dumps(plan)})
+        saved = response.get_json()
+        self.assertEqual(saved["plan"]["chapters"][0]["name"], "Компьютерные игры")
+        self.assertIn("Мой шаблон: Про игры", self.client.get("/").get_data(as_text=True))
+
+        response = self.client.post("/delete_my_template", data={"template_file": saved["file"]})
+        self.assertTrue(response.get_json()["deleted"])
+        self.assertNotIn("Мой шаблон: Про игры", self.client.get("/").get_data(as_text=True))
+
+    def test_user_profile_can_be_deleted(self):
+        path = create_profile(
+            profiles_folder=PROFILES_FOLDER, name="Удаляемый", font_name="Arial", font_size_pt=12, line_spacing=1,
+            first_line_indent_cm=1, margin_top_cm=2, margin_bottom_cm=2, margin_left_cm=2, margin_right_cm=2,
+        )
+        response = self.client.post("/delete_profile", data={"profile_file": os.path.basename(path)})
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(os.path.exists(path))
+
+    def test_every_template_passes_all_checks(self):
+        profile = os.path.join(PROFILES_FOLDER, "01_inzhenery_budushchego.json")
+        for work_type in WORK_TYPES:
+            for hints in [True, False]:
+                plan = default_plan(work_type)
+                plan["hints"] = hints
+                plan["appendix"] = True
+                response = self.client.post("/create_template", data={
+                    "plan": json.dumps(plan), "profile_file": "01_inzhenery_budushchego.json",
+                })
+                self.assertEqual(response.status_code, 200)
+                path = os.path.join(OUTPUTS_FOLDER, output_file(response.get_json()["url"]))
+                with tempfile.TemporaryDirectory() as folder:
+                    report = check_and_format_document(path, profile, os.path.join(folder, "out.docx"))
+                self.assertTrue(report["is_correct"], (work_type, hints, report))
+                if work_type in ("research", "project", "referat"):
+                    self.assertEqual(report["warnings"], [], (work_type, hints))
+
+    def test_business_plan_template_fits_shag_v_biznes(self):
+        plan = default_plan("business_plan")
+        response = self.client.post("/create_template", data={
+            "plan": json.dumps(plan), "profile_file": "04_shag_v_biznes.json",
+        })
+        path = os.path.join(OUTPUTS_FOLDER, output_file(response.get_json()["url"]))
+        profile = os.path.join(PROFILES_FOLDER, "04_shag_v_biznes.json")
+        with tempfile.TemporaryDirectory() as folder:
+            report = check_and_format_document(path, profile, os.path.join(folder, "out.docx"))
+        self.assertTrue(report["is_correct"], report)
+        self.assertEqual(report["warnings"], [])
+
+        document = Document(path)
+        layout = analyze_layout(document)
+        self.assertEqual(layout["first_section"].text, "Описание бизнес-идеи")
+
+    def test_letter_page_becomes_a4(self):
+        document = Document()
+        document.add_paragraph("Текст на американском листе Letter.")
+        with tempfile.TemporaryDirectory() as folder:
+            source = os.path.join(folder, "source.docx")
+            document.save(source)
+            profile = os.path.join(PROFILES_FOLDER, "01_inzhenery_budushchego.json")
+            report = check_and_format_document(source, profile, os.path.join(folder, "out.docx"))
+            section = Document(os.path.join(folder, "out.docx")).sections[0]
+        self.assertIn(1, report["failed"])
+        self.assertAlmostEqual(section.page_width.cm, 21, places=1)
+        self.assertAlmostEqual(section.page_height.cm, 29.7, places=1)
+
+    def test_inserted_title_page_keeps_its_sizes(self):
+        response = self.client.post(
+            "/create_title_page",
+            data={
+                "organization": "Тестовая организация",
+                "work_title": "Проверочная работа",
+                "group_0_who": "ученики 10 класса",
+                "group_0_name": ["Иванов И. И.", "Сидоров С. С.", "Петров П. П."],
+                "supervisor_position": "учитель",
+                "supervisor_name": "Смирнова А. А.",
+                "city": "Москва",
+                "year": "2026",
+                "profile_file": "01_inzhenery_budushchego.json",
+            },
+        )
+        title_file = response.get_json()["file"]
+        response = self.client.post(
+            "/apply",
+            data={
+                "document": (make_badly_formatted_docx(), "work.docx"),
+                "profile_file": "01_inzhenery_budushchego.json",
+                "title_file": title_file,
+            },
+            content_type="multipart/form-data",
+        )
+        output = Document(os.path.join(OUTPUTS_FOLDER, output_file(response.get_json()["url"])))
+
+        title = [p for p in output.paragraphs if p.text == "ПРОВЕРОЧНАЯ РАБОТА"][0]
+        self.assertEqual(title.runs[0].font.size.pt, 16)
+        self.assertTrue(title.runs[0].font.bold)
+
+    def test_underline_color_and_spaces_are_fixed(self):
+        document = Document()
+        paragraph = document.add_paragraph("Текст с подчёркиванием и цветом.")
+        paragraph.runs[0].font.underline = True
+        paragraph.runs[0].font.color.rgb = RGBColor(255, 0, 0)
+        paragraph.paragraph_format.space_after = Pt(12)
+        paragraph.paragraph_format.left_indent = Cm(1)
+        with tempfile.TemporaryDirectory() as folder:
+            source = os.path.join(folder, "source.docx")
+            document.save(source)
+            profile = os.path.join(PROFILES_FOLDER, "01_inzhenery_budushchego.json")
+
+            report = check_and_format_document(source, profile, os.path.join(folder, "out.docx"))
+
+            self.assertIn(13, report["failed"])
+            self.assertIn(14, report["failed"])
+            fixed = Document(os.path.join(folder, "out.docx")).paragraphs[0]
+            self.assertFalse(fixed.runs[0].font.underline)
+            self.assertEqual(fixed.runs[0].font.color.rgb, RGBColor(0, 0, 0))
+            self.assertEqual(fixed.paragraph_format.space_after.pt, 0)
+            self.assertEqual(fixed.paragraph_format.left_indent.cm, 0)
 
     def test_empty_title_page_is_rejected(self):
         response = self.client.post("/create_title_page", data={})
@@ -318,7 +556,7 @@ class SmokeTests(unittest.TestCase):
         )
         criteria = response.get_json()["criteria"]
         margins = [c for c in criteria if c["n"] == 1][0]
-        self.assertEqual(margins["details"], "верхнее 1 → 2 см, нижнее 1 → 2 см, левое 1 → 3 см, правое 1 → 1,5 см")
+        self.assertEqual(margins["details"], "формат листа → A4, верхнее 1 → 2 см, нижнее 1 → 2 см, левое 1 → 3 см, правое 1 → 1,5 см")
 
     def test_presentation_traps_are_reported(self):
         with tempfile.TemporaryDirectory() as folder:

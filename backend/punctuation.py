@@ -1,6 +1,3 @@
-# Правила пунктуации. Каждое правило смотрит на текст абзаца
-# и возвращает список правок, ничего не меняя само.
-
 from docx.oxml.ns import qn
 
 from word_helpers import is_caption
@@ -37,11 +34,10 @@ POTOMU_SKIP = ["не", "только", "именно", "лишь", "даже"]
 STOP_END = CONJ + PREPS
 
 
-# --- текст абзаца и правки в нём ---
 # правка - это кортеж (начало, конец, новый_текст): кусок text[начало:конец] заменяется на новый_текст
 
 def get_nodes(p):
-    # кусочки текста абзаца. Перенос строки и табуляция тоже занимают 1 символ
+    # перенос строки и табуляция тоже занимают 1 символ
     items = []
 
     def walk(el):
@@ -136,8 +132,6 @@ def clean_view(piece, left, right, size):
     return ("…" if left > 0 else "") + piece + ("…" if right < size else "")
 
 
-# --- помощники ---
-
 def find_words(text):
     # список (слово, начало, конец)
     words = []
@@ -178,7 +172,6 @@ def prev_char(text, start):
 
 
 def comma_pos(text, start):
-    # куда ставить запятую перед словом, которое начинается в start
     j = start - 1
     while j >= 0 and text[j] in " \t\xa0":
         j -= 1
@@ -213,8 +206,6 @@ def ends_line(text, i):
         return False
     return text[end + 1:].split("\n")[0].strip() == ""
 
-
-# --- правила: каждое возвращает список правок ---
 
 def double_spaces(text):
     found = []
@@ -401,8 +392,6 @@ TEXT_RULES = [double_spaces, space_before, no_space_after, repeated_marks, small
               abbreviations, space_after_abbr, paren_space, missing_commas]
 
 
-# --- строки абзаца: точка в конце и большая буква в пунктах списка ---
-
 def item_start(line):
     # где начинается текст пункта после "1." или "-"; если строка не пункт, вернёт -1
     i = 0
@@ -501,7 +490,6 @@ def find_edits(text, is_list, check_end, prev_dot):
     more, prev_dot = line_edits(text, is_list, check_end, prev_dot)
     edits += more
     edits.sort()
-    # убираем правки, которые накладываются друг на друга или повторяются
     result = []
     last_end = -1
     for edit in edits:
@@ -515,15 +503,13 @@ def find_edits(text, is_list, check_end, prev_dot):
 
 
 def is_extra_dot(edit, result):
-    # точку не ставим, если предыдущая правка в этом же месте уже закончилась точкой (например "т.д.")
+    # не ставим точку, если правка на этом месте уже кончается точкой ("т.д.")
     start, end, new = edit
     if new != "." or start != end or not result:
         return False
     last_start, last_end, last_new = result[-1]
     return last_end == start and last_new.endswith(".")
 
-
-# --- пометки Word: красные волнистые линии ---
 
 def spell_words(doc):
     words = []
