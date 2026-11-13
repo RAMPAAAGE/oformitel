@@ -377,3 +377,184 @@ label.check input { width: 18px; min-height: 18px; height: 18px; margin: 0; acce
   .tabs { gap: 16px; overflow-x: auto; }
   .tab-button { flex: 0 0 auto; }
 }
+
+/* ================================================================
+   Оформление «Терминал»: экран старого компьютера. Зелёный текст на
+   чёрном, всё моноширинным шрифтом JetBrains Mono, кнопки - команды
+   в квадратных скобках, жёлтый - предупреждения, красный - ошибки.
+   ================================================================ */
+
+@font-face { font-family: "JetBrains Mono"; font-weight: 400; font-display: swap; src: url("/fonts/jetbrains-mono-cyrillic-400.woff2") format("woff2"); unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: "JetBrains Mono"; font-weight: 400; font-display: swap; src: url("/fonts/jetbrains-mono-latin-400.woff2") format("woff2"); unicode-range: U+0000-00FF, U+2000-206F, U+2190-2193, U+2500-257F; }
+@font-face { font-family: "JetBrains Mono"; font-weight: 700; font-display: swap; src: url("/fonts/jetbrains-mono-cyrillic-700.woff2") format("woff2"); unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: "JetBrains Mono"; font-weight: 700; font-display: swap; src: url("/fonts/jetbrains-mono-latin-700.woff2") format("woff2"); unicode-range: U+0000-00FF, U+2000-206F, U+2190-2193, U+2500-257F; }
+
+/* общие переменные основной версии - в цвета терминала */
+:root, :root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0a0f0a;
+  --surface: #0f170f;
+  --surface-2: #0a0f0a;
+  --ink: #9cf59a;
+  --ink-2: #9cf59a;
+  --muted: #6fb06d;
+  --line: #2f5a2f;
+  --field: #2f5a2f;
+  --soft: #0f170f;
+  --soft-hover: #16231a;
+  --accent: #9cf59a;
+  --accent-hover: #c6ffc4;
+  --link: #7fdcff;
+  --on-accent: #0a0f0a;
+  --disabled: #2f5a2f;
+  --focus: #9cf59a;
+  --ok-text: #9cf59a;
+  --ok-bg: #0a0f0a;
+  --ok-line: #9cf59a;
+  --err-text: #ff6b6b;
+  --err-bg: #0a0f0a;
+  --err-line: #ff6b6b;
+  --warn-text: #ffbf3c;
+  --warn-bg: #0a0f0a;
+  --warn-line: #ffbf3c;
+  --danger-bg: #2a0f0f;
+  --result-bg: #0a0f0a;
+  --result-line: #9cf59a;
+  --inverse-bg: #0a0f0a;
+  --inverse-text: #9cf59a;
+  --shadow: rgba(0, 0, 0, 0.6);
+}
+
+/* переключатель темы не нужен: экран всегда тёмный */
+button.theme-toggle { display: none; }
+h1 { padding-right: 0; }
+
+:root {
+  color-scheme: dark;
+  --screen: #0a0f0a;
+  --panel: #0f170f;
+  --green: #9cf59a;
+  --green-dim: #6fb06d;
+  --amber: #ffbf3c;
+  --red: #ff6b6b;
+  --cyan: #7fdcff;
+  --ink: var(--green);
+  --muted: var(--green-dim);
+  --line: #2f5a2f;
+  --blue: var(--cyan);
+  --blue-dark: var(--cyan);
+  color: var(--green);
+  background: var(--screen);
+  font-family: "JetBrains Mono", "Menlo", monospace;
+  font-size: 15px;
+}
+
+body { background: var(--screen); }
+
+h1, h2, h3 { font-weight: 700; letter-spacing: 0; }
+h1 { font-size: 30px; color: var(--green); }
+h1::before { content: "C:\\> "; color: var(--green-dim); }
+h1::after { content: "█"; margin-left: 6px; animation: cursor 1s steps(1) infinite; }
+@keyframes cursor { 50% { opacity: 0; } }
+h2 { font-size: 19px; color: var(--green); text-transform: uppercase; }
+h2::before { content: "> "; color: var(--green-dim); }
+.intro, .hint, .profile-note, .criteria-list, .type-note { color: var(--green-dim); }
+
+.tabs { border-bottom: 1px dashed var(--line); gap: 2px; }
+.tab-button { border-radius: 0; color: var(--green-dim); font-weight: 400; }
+.tab-button:hover { background: var(--panel); color: var(--green); }
+.tab-button.active { background: var(--green); color: var(--screen); border-bottom-color: var(--green); }
+
+.card, .profile-bar {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 0;
+}
+label { color: var(--green); font-weight: 700; }
+label::before { content: "$ "; color: var(--green-dim); font-weight: 400; }
+label.check::before, .file-picker::before { content: none; }
+
+input, select {
+  background: var(--screen);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  color: var(--green);
+  caret-color: var(--green);
+}
+input::placeholder { color: #3f6e3e; }
+select option { background: var(--screen); }
+input:focus, select:focus, button:focus-visible, .file-picker:focus-within {
+  outline: 1px solid var(--green);
+  outline-offset: 0;
+  border-color: var(--green);
+}
+.file-picker { background: var(--screen); border: 1px dashed var(--line); border-radius: 0; }
+.file-button { background: var(--line); color: var(--green); border-radius: 0; }
+.file-picker:hover .file-button { background: var(--green); color: var(--screen); }
+.file-name { color: var(--green-dim); }
+
+/* кнопки-команды: [ ПРОВЕРИТЬ И ОФОРМИТЬ ] */
+button {
+  background: var(--green);
+  color: var(--screen);
+  border: 1px solid var(--green);
+  border-radius: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+button::before { content: "[ "; }
+button::after { content: " ]"; }
+/* у крестиков «×» скобки лишние */
+button.remove-person::before, button.remove-person::after,
+button.remove-chapter::before, button.remove-chapter::after { content: none; }
+button:hover { background: #c6ffc4; }
+button:disabled { background: var(--line); color: var(--green-dim); }
+button.gray, button.add-person, button.remove-person, button.remove-chapter, button.remove-group {
+  background: transparent;
+  color: var(--green);
+  border: 1px dashed var(--line);
+  text-transform: none;
+}
+button.gray:hover, button.add-person:hover, button.remove-person:hover, button.remove-chapter:hover {
+  background: var(--panel);
+  border-color: var(--green);
+}
+button.danger, button.remove-group { color: var(--red); }
+button.danger:hover, button.remove-group:hover { background: #2a0f0f; color: var(--red); }
+.go-tab, details summary { color: var(--cyan); }
+
+.notice { background: var(--screen); border-left-width: 3px; }
+.notice::before { content: "! "; font-weight: 700; }
+.success { color: var(--green); border-color: var(--green); }
+.success::before { content: "OK "; }
+.error { color: var(--red); border-color: var(--red); }
+.error::before { content: "ОШИБКА: "; }
+.warning { color: var(--amber); border-color: var(--amber); }
+.result-block { background: var(--screen); border: 1px solid var(--green); border-radius: 0; }
+.result-block a { color: var(--cyan); }
+
+table { border: 1px solid var(--line); }
+th, td { border-bottom: 1px dashed var(--line); }
+th { color: var(--green-dim); }
+.changes .old { color: var(--red); text-decoration: line-through; }
+.changes .new { color: var(--green); }
+
+.group { background: var(--screen); border: 1px dashed var(--line); border-radius: 0; }
+label.check input { accent-color: var(--green); }
+.tip { background: transparent; border: 1px solid var(--line); border-radius: 0; color: var(--green); }
+.tip:hover::after, .tip.force::after { background: var(--screen); color: var(--green); border: 1px solid var(--green); border-radius: 0; }
+.toast { background: var(--screen); color: var(--green); border: 1px solid var(--green); border-radius: 0; }
+
+/* предпросмотр - распечатка на бумаге, поэтому остаётся белым */
+.sheet { border: 1px solid var(--green); border-radius: 0; box-shadow: 6px 6px 0 var(--line); }
+.outline { background: var(--screen); border: 1px solid var(--line); border-radius: 0; }
+.outline ol { font-family: "JetBrains Mono", monospace; font-size: 13px; color: var(--green); }
+.outline li { border-bottom: 1px dotted var(--line); }
+.outline .outline-service { color: var(--green-dim); }
+
+@media (prefers-reduced-motion: reduce) {
+  h1::after { animation: none; }
+}
+
+/* список шагов: в основе цвет задан для светлого фона */
+.steps ol { color: inherit; }
