@@ -377,3 +377,132 @@ label.check input { width: 18px; min-height: 18px; height: 18px; margin: 0; acce
   .tabs { gap: 16px; overflow-x: auto; }
   .tab-button { flex: 0 0 auto; }
 }
+
+/* ================================================================
+   Оформление «Школьная доска»: тёмно-зелёная доска в деревянной раме,
+   всё написано мелом одним рукописным шрифтом. Жёлтый мел - главное
+   действие, розовый - ошибки, голубой - ссылки. Лист Word прижат магнитом.
+   ================================================================ */
+
+@font-face { font-family: "Neucha"; font-display: swap; src: url("/fonts/neucha-cyrillic-400.woff2") format("woff2"); unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: "Neucha"; font-display: swap; src: url("/fonts/neucha-latin-400.woff2") format("woff2"); unicode-range: U+0000-00FF, U+2000-206F, U+2190-2193; }
+
+/* цвета доски - через те же переменные, что и у основной версии */
+:root, :root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #22382c;
+  --surface: #2a4335;
+  --surface-2: #263e31;
+  --ink: #f1efe4;
+  --ink-2: #e6e3d6;
+  --muted: #c9cdbf;
+  --line: rgba(241, 239, 228, 0.4);
+  --field: rgba(241, 239, 228, 0.45);
+  --soft: rgba(0, 0, 0, 0.18);
+  --soft-hover: rgba(241, 239, 228, 0.12);
+  --accent: #f5d76e;
+  --accent-hover: #fbe596;
+  --link: #a8d8f5;
+  --on-accent: #1d3326;
+  --disabled: #8f8a64;
+  --focus: #f5d76e;
+  --ok-text: #b9eec9;
+  --ok-bg: rgba(0, 0, 0, 0.2);
+  --ok-line: #8fdca8;
+  --err-text: #f4a6b8;
+  --err-bg: rgba(0, 0, 0, 0.2);
+  --err-line: #f4a6b8;
+  --warn-text: #f5d76e;
+  --warn-bg: rgba(0, 0, 0, 0.2);
+  --warn-line: #f5d76e;
+  --danger-bg: rgba(244, 166, 184, 0.15);
+  --result-bg: rgba(0, 0, 0, 0.2);
+  --result-line: #f5d76e;
+  --inverse-bg: #f1efe4;
+  --inverse-text: #1d3326;
+  --shadow: rgba(0, 0, 0, 0.4);
+  --wood: #7a4b25;
+  /* «нарисованные от руки» скругления: у каждого угла свой радиус */
+  --hand: 255px 12px 225px 12px / 12px 225px 12px 255px;
+}
+
+/* один шрифт везде; рукописный мельче обычного, поэтому крупнее базовый размер */
+:root { font-family: "Neucha", "Segoe UI", sans-serif; font-size: 18px; }
+h1, h2, .type-heading, label, .tab-button, button, .go-tab, th { font-weight: 400; letter-spacing: 0.01em; }
+
+body { border: 18px solid var(--wood); border-bottom-width: 0; min-height: 100vh; }
+/* полочка для мела внизу доски */
+body::after {
+  content: "";
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 22px;
+  background: var(--wood);
+  border-top: 4px solid #5e381a;
+  box-shadow: 0 -3px 6px rgba(0, 0, 0, 0.3);
+}
+main { padding-bottom: 80px; }
+
+h1 { font-size: 50px; letter-spacing: 0; }
+h1::after { content: " ✎"; color: var(--accent); }
+h2 { font-size: 30px; color: var(--accent); letter-spacing: 0; }
+
+/* переключатель темы не нужен: доска всегда тёмная */
+button.theme-toggle { display: none; }
+h1 { padding-right: 0; }
+
+.tabs { border-bottom: 2px dashed var(--line); }
+.tab-button { font-size: 23px; border-radius: 0; }
+.tab-button:hover { background: transparent; color: var(--ink); }
+.tab-button.active { color: var(--ink); border-bottom: 3px solid var(--accent); }
+
+.card, .profile-bar, .group, .outline, .result-block {
+  border: 2px solid var(--line);
+  border-radius: var(--hand);
+}
+input, select, .file-picker { border-width: 2px; border-radius: 10px; }
+select option { background: var(--bg); color: var(--ink); }
+
+button { border: 2px solid var(--accent); border-radius: var(--hand); font-size: 20px; }
+button.gray, button.add-person, button.remove-person, button.remove-chapter, button.remove-group, button.danger {
+  background: transparent;
+  border: 2px dashed var(--line);
+  color: var(--ink);
+}
+button.gray:hover, button.add-person:hover, button.remove-person:hover, button.remove-chapter:hover {
+  background: var(--soft-hover);
+  border-color: var(--ink);
+}
+button.danger, button.remove-group { color: var(--err-text); }
+.file-button { background: var(--ink); color: var(--on-accent); }
+.file-picker:hover .file-button { background: var(--accent); }
+
+.go-tab, details summary { text-decoration: underline dashed; text-underline-offset: 4px; }
+.notice { border-left-width: 4px; }
+.changes .old { text-decoration: line-through; }
+.tip { background: transparent; border: 1px solid var(--muted); }
+
+/* бумажный лист Word на доске, прижатый магнитом */
+.sheet, .outline { transform: rotate(-1deg); }
+.sheet::before, .outline::before {
+  content: "";
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  border-radius: 50%;
+  background: #d9534f;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+}
+.outline { background: #fbfaf5; color: #222; border-color: #fbfaf5; }
+.outline .hint, .outline .outline-service { color: #555; }
+.outline li { border-bottom-color: #ccc; }
+.outline-label { color: #222; }
+
+/* мелкий рукописный текст плохо читается - подписи и ссылки крупнее */
+.hint, .criteria-list, .profile-bar-row .go-tab, .result-block .go-tab, th, td, .tip:hover::after { font-size: 17px; }
+.tip:hover::after, .tip.force::after { font-size: 17px; }
