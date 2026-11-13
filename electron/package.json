@@ -1,6 +1,6 @@
 {
   "name": "oformitel-dokumentov",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Настольная программа для оформления документов DOCX",
   "main": "main.js",
   "scripts": {
