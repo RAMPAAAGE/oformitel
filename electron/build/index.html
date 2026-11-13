@@ -4,11 +4,33 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Оформитель документов</title>
+  <script>
+    // Тема выставляется до отрисовки, чтобы при запуске не мигал светлый экран.
+    // Без сохранённого выбора берётся тема системы.
+    (function () {
+      var theme = null;
+      try {
+        theme = localStorage.getItem("theme");
+      } catch (error) {
+        theme = null;
+      }
+      if (!theme) {
+        theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      }
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
   <main>
     <h1>Оформитель документов</h1>
+    <button type="button" class="theme-toggle" id="theme-toggle">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path>
+      </svg>
+      <span id="theme-toggle-text">Тёмная тема</span>
+    </button>
     <p class="intro">
       Приведение работы к требованиям конференции: оформление документа,
       создание титульного листа и проверка презентации.
@@ -1209,6 +1231,22 @@
     document.getElementById("year").value = new Date().getFullYear();
     titleForm.addEventListener("input", rememberTitleFields);
     updatePreview();
+
+    var themeToggle = document.getElementById("theme-toggle");
+
+    function showThemeButton() {
+      var dark = document.documentElement.getAttribute("data-theme") === "dark";
+      document.getElementById("theme-toggle-text").textContent = dark ? "Светлая тема" : "Тёмная тема";
+    }
+
+    themeToggle.addEventListener("click", function () {
+      var dark = document.documentElement.getAttribute("data-theme") === "dark";
+      var theme = dark ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", theme);
+      remember("theme", theme);
+      showThemeButton();
+    });
+    showThemeButton();
   </script>
 </body>
 </html>

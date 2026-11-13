@@ -459,7 +459,7 @@ class SmokeTests(unittest.TestCase):
         response = self.client.get("/style.css")
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"--blue", response.data)
+        self.assertIn(b"--accent", response.data)
         response.close()
 
     def test_toc_trap_keeps_page_number_on_same_line(self):
