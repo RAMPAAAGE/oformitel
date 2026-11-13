@@ -377,3 +377,136 @@ label.check input { width: 18px; min-height: 18px; height: 18px; margin: 0; acce
   .tabs { gap: 16px; overflow-x: auto; }
   .tab-button { flex: 0 0 auto; }
 }
+
+/* ================================================================
+   Оформление «Газета»: программа выглядит как свежий номер газеты.
+   Шапка с двойными линейками, вкладки - рубрики, тонкие разделители,
+   чёрная краска и красный цвет «срочной новости». Один шрифт везде -
+   Old Standard TT (классический русский наборный шрифт).
+   ================================================================ */
+
+@font-face { font-family: "Old Standard TT"; font-weight: 400; font-display: swap; src: url("/fonts/old-standard-tt-cyrillic-400.woff2") format("woff2"); unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: "Old Standard TT"; font-weight: 400; font-display: swap; src: url("/fonts/old-standard-tt-latin-400.woff2") format("woff2"); unicode-range: U+0000-00FF, U+2000-206F, U+2190-2193; }
+@font-face { font-family: "Old Standard TT"; font-weight: 700; font-display: swap; src: url("/fonts/old-standard-tt-cyrillic-700.woff2") format("woff2"); unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: "Old Standard TT"; font-weight: 700; font-display: swap; src: url("/fonts/old-standard-tt-latin-700.woff2") format("woff2"); unicode-range: U+0000-00FF, U+2000-206F, U+2190-2193; }
+@font-face { font-family: "Old Standard TT"; font-style: italic; font-weight: 400; font-display: swap; src: url("/fonts/old-standard-tt-cyrillic-400-italic.woff2") format("woff2"); unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+
+/* газетная бумага и типографская краска */
+:root, :root[data-theme="dark"] {
+  color-scheme: light;
+  --bg: #e6e4de;
+  --surface: #f3f2ee;
+  --surface-2: #ecebe6;
+  --ink: #141414;
+  --ink-2: #1f1f1f;
+  --muted: #4a4a4a;
+  --line: #141414;
+  --field: #6b6b6b;
+  --soft: #e2e0da;
+  --soft-hover: #d6d3cb;
+  --accent: #141414;
+  --accent-hover: #333333;
+  --link: #a3121b;
+  --on-accent: #f3f2ee;
+  --disabled: #8a8a8a;
+  --focus: #a3121b;
+  --ok-text: #1f4d2b;
+  --ok-bg: #f3f2ee;
+  --ok-line: #1f4d2b;
+  --err-text: #a3121b;
+  --err-bg: #f3f2ee;
+  --err-line: #a3121b;
+  --warn-text: #6b4a00;
+  --warn-bg: #f3f2ee;
+  --warn-line: #6b4a00;
+  --danger-bg: #ead6d4;
+  --result-bg: #f3f2ee;
+  --result-line: #141414;
+  --inverse-bg: #141414;
+  --inverse-text: #f3f2ee;
+  --shadow: rgba(0, 0, 0, 0.18);
+}
+
+:root { font-family: "Old Standard TT", "Times New Roman", serif; font-size: 17px; }
+button.theme-toggle { display: none; }
+
+/* шапка газеты: название по центру между двойными линейками */
+h1 {
+  padding: 14px 0 10px;
+  border-top: 6px double var(--ink);
+  border-bottom: 6px double var(--ink);
+  font-size: clamp(36px, 6vw, 60px);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-align: center;
+  text-transform: uppercase;
+}
+.intro {
+  max-width: none;
+  margin: 8px 0 26px;
+  color: var(--muted);
+  font-style: italic;
+  text-align: center;
+}
+.intro::before { content: "Выпуск для тех, кто сдаёт работу. "; font-style: normal; font-weight: 700; color: var(--link); }
+
+/* вкладки - рубрики газеты через вертикальную черту */
+.tabs { justify-content: center; gap: 0; border-bottom: 2px solid var(--ink); }
+.tab-button {
+  padding: 10px 16px;
+  border-radius: 0;
+  border-right: 1px solid var(--ink);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.tab-button:last-child { border-right: 0; }
+.tab-button:hover { background: transparent; color: var(--link); }
+.tab-button.active { background: transparent; color: var(--link); border-bottom: 4px solid var(--link); }
+
+/* статьи: без скруглений, жирная линейка сверху */
+.card, .profile-bar, .result-block, .outline {
+  border: 0;
+  border-top: 3px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+  border-radius: 0;
+  background: var(--surface);
+}
+h2 { font-size: 30px; font-weight: 700; letter-spacing: 0; }
+.type-heading { font-style: italic; }
+label { font-weight: 700; }
+
+input, select, .file-picker { border-radius: 0; background: #faf9f6; }
+.file-button { border: 1px solid var(--ink); border-radius: 0; }
+.group { border: 1px dashed var(--ink); border-radius: 0; }
+
+/* кнопки - набраны капителью, как подписи в газете */
+button {
+  border-radius: 0;
+  font-size: 15px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+button.gray, button.add-person, button.remove-person, button.remove-chapter, button.remove-group, button.danger {
+  background: transparent;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+button.danger, button.remove-group { color: var(--err-text); border-color: var(--err-text); }
+
+.go-tab, details summary { color: var(--link); font-style: italic; }
+.notice { border: 1px solid; border-left-width: 6px; }
+.notice.error::before { content: "Срочно: "; font-weight: 700; }
+.changes .old { text-decoration: line-through; }
+th { letter-spacing: 0.12em; text-transform: uppercase; }
+.tip { border: 1px solid var(--ink); background: transparent; border-radius: 50%; }
+.tip:hover::after, .tip.force::after { border-radius: 0; font-size: 15px; }
+.toast { border-radius: 0; }
+
+/* предпросмотр - вырезка из газеты */
+.sheet { border: 1px solid var(--ink); box-shadow: 4px 4px 0 var(--soft-hover); }
+.outline ol { font-family: "Old Standard TT", serif; }
