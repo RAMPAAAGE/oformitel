@@ -19,6 +19,7 @@ from engine import (
     create_profile,
     list_profiles,
     load_profile,
+    profile_for_type,
     update_profile,
     validate_docx_file,
 )
@@ -73,8 +74,9 @@ def create_work_folders():
     copy_default_profiles()
 
 
-# так встроенные профили назывались в старых версиях; их копии у пользователя дублируют новые
-OLD_BUILTIN_FILES = ["gost_7_32.json", "inzhenery_budushchego.json"]
+# так встроенные профили назывались в старых версиях; их копии у пользователя дублируют новые.
+# Профиль тезисов больше не нужен: размер и интервал для тезисов теперь есть в каждом профиле
+OLD_BUILTIN_FILES = ["gost_7_32.json", "inzhenery_budushchego.json", "03_inzhenery_budushchego_tezisy.json"]
 
 
 def copy_default_profiles():
@@ -204,6 +206,8 @@ def get_profile_values(form):
             "margin_left_cm": float(form["margin_left_cm"]),
             "margin_right_cm": float(form["margin_right_cm"]),
             "document_type": form.get("document_type", "free"),
+            "thesis_font_size_pt": int(form.get("thesis_font_size_pt") or 12),
+            "thesis_line_spacing": float(form.get("thesis_line_spacing") or 1.0),
         }
     except (KeyError, ValueError):
         raise ValueError("Заполните все числовые поля профиля корректно.")
@@ -214,6 +218,10 @@ def get_profile_values(form):
         raise ValueError("Размер шрифта должен быть от 1 до 100 пт.")
     if not 0.1 <= values["line_spacing"] <= 5:
         raise ValueError("Межстрочный интервал должен быть от 0.1 до 5.")
+    if not 1 <= values["thesis_font_size_pt"] <= 100:
+        raise ValueError("Размер шрифта для тезисов должен быть от 1 до 100 пт.")
+    if not 0.1 <= values["thesis_line_spacing"] <= 5:
+        raise ValueError("Межстрочный интервал для тезисов должен быть от 0.1 до 5.")
     if not 0 <= values["first_line_indent_cm"] <= 10:
         raise ValueError("Отступ первой строки должен быть от 0 до 10 см.")
     for margin_name in ("margin_top_cm", "margin_bottom_cm", "margin_left_cm", "margin_right_cm"):
@@ -361,17 +369,27 @@ def apply_profile():
             validate_docx_file(input_path)
 
             skip_title = request.form.get("skip_title") == "1"
-            if not title_path and not skip_title and not analyze_layout(Document(input_path))["title"]:
+            title_mode = request.form.get("title_mode", "")
+            has_title = len(analyze_layout(Document(input_path))["title"]) > 0
+            if not title_path and not skip_title and not has_title:
                 return jsonify({
                     "no_title": True,
                     "message": "В работе нет титульного листа. Создайте его здесь же — после этого работа оформится "
                                "автоматически. Или оформите работу без титульного листа.",
                 })
+            if title_path and has_title and title_mode not in ("replace", "keep", "skip"):
+                return jsonify({
+                    "two_titles": True,
+                    "message": "В работе уже есть свой титульный лист, а вы выбрали ещё один. "
+                               "Заменить старый титульный лист новым или оставить оба?",
+                })
+            if title_mode == "skip":
+                title_path = None  # новый не вставляем, остаётся тот, что был в работе
 
             output_name = get_free_file_name(OUTPUTS_FOLDER, "formatted_" + input_name)
             output_path = os.path.join(OUTPUTS_FOLDER, output_name)
             result = check_and_format_document(input_path, profile_path, output_path, title_path,
-                                               request.form.get("document_type"))
+                                               request.form.get("document_type"), title_mode)
         finally:
             # исходный файл больше не нужен: результат уже сохранён в outputs
             os.remove(input_path)
@@ -471,7 +489,7 @@ def download_file(file_name):
 def create_template_route():
     try:
         plan = get_template_plan(request.form)
-        profile = load_profile(get_profile_path(request.form))
+        profile = profile_for_type(load_profile(get_profile_path(request.form)), plan["type"])
         title_path = None
         if plan["title"] not in ("none", "placeholder"):
             title_path = get_title_path(plan["title"])

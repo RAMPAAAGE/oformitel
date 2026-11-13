@@ -14,8 +14,13 @@ from word_helpers import (
 )
 
 SPACING_ROLES = ["body", "heading", "list", "center", "caption"]
-JUSTIFY_ROLES = ["body", "list"]
+JUSTIFY_ROLES = ["body", "list", "heading"]  # по правилам по ширине весь текст, и заголовки тоже
 ZERO_SPACE_ROLES = ["body", "list", "heading", "caption"]
+# один и тот же раздел в разных работах называют по-разному
+OTHER_NAMES = {
+    "список литературы": ["список использованных источников", "список использованной литературы",
+                          "список источников", "литература", "источники"],
+}
 
 
 def is_a4(section):
@@ -398,7 +403,8 @@ def structure_warnings(doc, profile):
         if p.text.strip():
             headings.add(clean(p.text))
     for section in rules.get("sections", []):
-        if section not in headings:
+        names = [section] + OTHER_NAMES.get(section, [])
+        if not headings.intersection(names):
             warnings.append("Не найден обязательный раздел «" + section.capitalize() + "».")
     return warnings
 
@@ -435,7 +441,7 @@ def missing_references(doc, layout):
     # на каждый рисунок и таблицу в тексте должна быть ссылка: "(рис. 2)", "в таблице 1"
     text = ""
     for p in doc.paragraphs:
-        if get_role(p, layout) in JUSTIFY_ROLES:
+        if get_role(p, layout) in ("body", "list"):
             text += p.text.lower() + "\n"
     pictures = 0
     for p in doc.paragraphs:

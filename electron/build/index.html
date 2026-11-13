@@ -322,6 +322,15 @@
                 <input id="line_spacing" name="line_spacing" type="number" min="0.1" step="0.1" value="1.5" required>
               </div>
               <div>
+                <label for="thesis_font_size_pt">Размер шрифта для тезисов, пт
+                  <span class="tip" data-tip="Тезисы — краткое изложение работы на 1–2 страницы. Этот размер программа возьмёт, если вверху выбран тип работы «Тезисы».">?</span></label>
+                <input id="thesis_font_size_pt" name="thesis_font_size_pt" type="number" min="1" value="12" required>
+              </div>
+              <div>
+                <label for="thesis_line_spacing">Межстрочный интервал для тезисов</label>
+                <input id="thesis_line_spacing" name="thesis_line_spacing" type="number" min="0.1" step="0.1" value="1" required>
+              </div>
+              <div>
                 <label for="first_line_indent_cm">Отступ первой строки, см</label>
                 <input id="first_line_indent_cm" name="first_line_indent_cm" type="number" min="0" step="0.01" value="1.25" required>
               </div>
@@ -421,10 +430,11 @@
     var builtinFiles = {{ builtin_files | tojson }};
     var profileSelect = document.getElementById("edit_profile_file");
     var profileForm = document.getElementById("profile-form");
-    var profileFields = ["name", "font_name", "font_size_pt", "line_spacing", "first_line_indent_cm",
-      "margin_top_cm", "margin_bottom_cm", "margin_left_cm", "margin_right_cm"];
+    var profileFields = ["name", "font_name", "font_size_pt", "line_spacing", "thesis_font_size_pt", "thesis_line_spacing",
+      "first_line_indent_cm", "margin_top_cm", "margin_bottom_cm", "margin_left_cm", "margin_right_cm"];
     var newProfile = {
-      name: "", font_name: "Times New Roman", font_size_pt: 14, line_spacing: 1.5, first_line_indent_cm: 1.25,
+      name: "", font_name: "Times New Roman", font_size_pt: 14, line_spacing: 1.5,
+      thesis_font_size_pt: 12, thesis_line_spacing: 1, first_line_indent_cm: 1.25,
       margin_top_cm: 2, margin_bottom_cm: 2, margin_left_cm: 2, margin_right_cm: 2, document_type: "free"
     };
 
@@ -640,17 +650,31 @@
         var without = make("button", "Оформить без него", "gray");
         without.type = "button";
         without.addEventListener("click", function () {
-          sendForm(docForm, function (result) {
-            showDocResult(result);
-            if (!result.error && !result.correct && !result.no_title) {
-              docForm.reset();
-            }
-            docResult.scrollIntoView();
-          }, { skip_title: "1" });
+          sendDocument({ skip_title: "1" });
         });
         box.appendChild(create);
         box.appendChild(without);
         docResult.appendChild(box);
+        return;
+      }
+
+      if (data.two_titles) {
+        var choice = make("div", "", "notice warning choice");
+        choice.appendChild(make("p", data.message));
+        var options = [
+          ["Заменить старый", "replace", ""],
+          ["Оставить оба", "keep", "gray"],
+          ["Не вставлять новый", "skip", "gray"]
+        ];
+        options.forEach(function (option) {
+          var button = make("button", option[0], option[2]);
+          button.type = "button";
+          button.addEventListener("click", function () {
+            sendDocument({ title_mode: option[1] });
+          });
+          choice.appendChild(button);
+        });
+        docResult.appendChild(choice);
         return;
       }
 
@@ -688,15 +712,21 @@
       }
     }
 
-    docForm.addEventListener("submit", function (event) {
-      event.preventDefault();
+    // extra - ответ на вопрос программы (без титульного листа, что делать со вторым титульным листом)
+    function sendDocument(extra) {
       sendForm(docForm, function (data) {
         showDocResult(data);
-        if (!data.error && !data.correct && !data.no_title) {
+        // пока программа ждёт ответа на вопрос, выбранный файл не сбрасываем
+        if (!data.error && !data.correct && !data.no_title && !data.two_titles) {
           docForm.reset();
         }
         docResult.scrollIntoView();
-      });
+      }, extra);
+    }
+
+    docForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+      sendDocument();
     });
 
     document.getElementById("clear-button").addEventListener("click", function () {

@@ -37,6 +37,12 @@ DOCUMENT_TYPES = {
         "toc": False,
         "sections": ["цель", "ход работы", "результат", "заключение"],
     },
+    "theses": {
+        "label": "Тезисы",
+        "title_page": False,
+        "toc": False,
+        "sections": [],
+    },
     "report": {
         "label": "Доклад",
         "title_page": False,
@@ -76,7 +82,8 @@ def list_profiles(folder="profiles"):
 
 
 def make_profile(name, font_name, font_size_pt, line_spacing, first_line_indent_cm,
-                 margin_top_cm, margin_bottom_cm, margin_left_cm, margin_right_cm, document_type="free"):
+                 margin_top_cm, margin_bottom_cm, margin_left_cm, margin_right_cm, document_type="free",
+                 thesis_font_size_pt=12, thesis_line_spacing=1.0):
     if not name:
         raise ValueError("Укажите название профиля.")
     if not font_name:
@@ -93,9 +100,23 @@ def make_profile(name, font_name, font_size_pt, line_spacing, first_line_indent_
         "margin_bottom_cm": margin_bottom_cm,
         "margin_left_cm": margin_left_cm,
         "margin_right_cm": margin_right_cm,
+        "thesis_font_size_pt": thesis_font_size_pt,
+        "thesis_line_spacing": thesis_line_spacing,
         "document_type": document_type,
         "structure": copy.deepcopy(DOCUMENT_TYPES[document_type]),
     }
+
+
+def profile_for_type(profile, document_type):
+    # тип работы выбран в программе: обязательные разделы берём по нему, а не из профиля
+    if document_type in DOCUMENT_TYPES:
+        profile["document_type"] = document_type
+        profile["structure"] = DOCUMENT_TYPES[document_type]
+    if profile.get("document_type") == "theses":
+        # у тезисов свой размер шрифта и интервал (у «Инженеров будущего» - 12 пт и одинарный)
+        profile["font_size_pt"] = profile.get("thesis_font_size_pt", 12)
+        profile["line_spacing"] = profile.get("thesis_line_spacing", 1.0)
+    return profile
 
 
 def save_profile(profile, path):

@@ -269,7 +269,8 @@ def repeated_marks(text):
             j = i
             while j < len(text) and text[j] == ch:
                 j += 1
-            if j - i >= 2 and (ch != "." or j - i == 2):
+            # "../папка" - путь к файлу, а не лишняя точка
+            if j - i >= 2 and (ch != "." or j - i == 2) and not is_link(token_at(text, i)):
                 found.append((i + 1, j, ""))
             i = j
         else:

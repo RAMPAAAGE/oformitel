@@ -111,9 +111,18 @@ WORK_TYPES = {
         ],
         "intro_items": [],
     },
+    "theses": {
+        "label": "Тезисы",
+        "tip": "Краткое изложение работы на 1–2 страницы: зачем она, что сделано и что получилось. "
+               "Их подают на конференцию вместе с работой или вместо неё на первом этапе.\n"
+               "Шрифт и интервал для тезисов берутся из профиля (у «Инженеров будущего» — 12 пт, одинарный).",
+        "toc": False, "intro": False, "numbered": False, "conclusion": False, "literature": True,
+        "chapters": [{"name": "Название работы", "subsections": []}],
+        "intro_items": [],
+    },
     "report": {
         "label": "Доклад",
-        "tip": "Текст выступления или тезисы: коротко о главном.\n"
+        "tip": "Текст выступления: коротко о главном.\n"
                "Титульный лист и оглавление обычно не нужны, в конце — список литературы.",
         "toc": False, "intro": False, "numbered": False, "conclusion": False, "literature": True,
         "chapters": [{"name": "Название доклада", "subsections": []}],
@@ -160,7 +169,7 @@ def default_plan(work_type):
     kind = WORK_TYPES.get(work_type, WORK_TYPES["research"])
     return {
         "type": work_type,
-        "title": "placeholder" if work_type not in ("report", "free") else "none",
+        "title": "placeholder" if work_type not in ("theses", "report", "free") else "none",
         "toc": kind["toc"],
         "intro": kind["intro"],
         "numbered": kind["numbered"],
@@ -219,9 +228,10 @@ def setup_styles(document, profile):
         heading_format.space_before = Pt(0)
         heading_format.space_after = Pt(0)
         heading_format.keep_with_next = True
-    document.styles["Heading 1"].paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    # по правилам весь текст по ширине, заголовки тоже (короткая строка по ширине стоит у левого края)
+    document.styles["Heading 1"].paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
     document.styles["Heading 1"].paragraph_format.first_line_indent = Cm(0)
-    document.styles["Heading 2"].paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    document.styles["Heading 2"].paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
     document.styles["Heading 2"].paragraph_format.first_line_indent = Cm(profile["first_line_indent_cm"])
 
     # стили строк оглавления: Word возьмёт их, когда будет обновлять оглавление
@@ -263,7 +273,7 @@ def add_field_part(paragraph, kind, instruction=None):
 def add_toc(document, entries):
     has_content = len(document.paragraphs) > 0
     toc_heading = document.add_paragraph("Оглавление")
-    toc_heading.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    toc_heading.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
     toc_heading.paragraph_format.first_line_indent = Cm(0)
     toc_heading.paragraph_format.page_break_before = has_content
     toc_heading.runs[0].font.bold = True

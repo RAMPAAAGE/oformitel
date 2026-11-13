@@ -363,7 +363,7 @@ class SmokeTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 path = os.path.join(OUTPUTS_FOLDER, output_file(response.get_json()["url"]))
                 with tempfile.TemporaryDirectory() as folder:
-                    report = check_and_format_document(path, profile, os.path.join(folder, "out.docx"))
+                    report = check_and_format_document(path, profile, os.path.join(folder, "out.docx"), None, work_type)
                 self.assertTrue(report["is_correct"], (work_type, hints, report))
                 if work_type in ("research", "project", "referat"):
                     self.assertEqual(report["warnings"], [], (work_type, hints))
@@ -567,6 +567,85 @@ class SmokeTests(unittest.TestCase):
         issue_types = [issue["issue_type"] for issue in issues]
         self.assertIn("Точка в конце заголовка", issue_types)
         self.assertIn("Слишком длинный текст на слайде", issue_types)
+
+    def test_heading_theme_font_becomes_times_and_justified(self):
+        # У стиля «Заголовок 1» в Word стоит «шрифт темы» (Calibri Light) - он главнее обычного шрифта
+        from word_helpers import get_font
+
+        document = Document()
+        heading = document.add_heading("Введение", level=1)
+        document.styles["Heading 1"].font.name = "Times New Roman"  # на вид Times, но тема всё равно перебивает
+        document.add_paragraph("Текст работы. " * 20)
+        self.assertNotEqual(get_font(heading.runs[0], heading), "Times New Roman")
+
+        with tempfile.TemporaryDirectory() as folder:
+            source = os.path.join(folder, "work.docx")
+            result = os.path.join(folder, "out.docx")
+            document.save(source)
+            report = check_and_format_document(
+                source, os.path.join(PROFILES_FOLDER, "01_inzhenery_budushchego.json"), result)
+            self.assertIn(2, report["failed"])
+            fixed = Document(result)
+        heading = [p for p in fixed.paragraphs if p.text == "Введение"][0]
+        self.assertEqual(get_font(heading.runs[0], heading), "Times New Roman")
+        self.assertEqual(heading.alignment, WD_ALIGN_PARAGRAPH.JUSTIFY)
+
+    def make_work_with_title(self):
+        file_data = io.BytesIO()
+        document = Document()
+        document.add_paragraph("Старая школа").alignment = WD_ALIGN_PARAGRAPH.CENTER
+        document.add_paragraph("СТАРОЕ НАЗВАНИЕ").alignment = WD_ALIGN_PARAGRAPH.CENTER
+        document.add_paragraph("Москва, 2025").alignment = WD_ALIGN_PARAGRAPH.CENTER
+        document.add_paragraph("Введение").paragraph_format.page_break_before = True
+        document.add_paragraph("Текст работы. " * 20)
+        document.save(file_data)
+        file_data.seek(0)
+        return file_data
+
+    def apply_with_new_title(self, extra):
+        response = self.client.post(
+            "/create_title_page",
+            data={"organization": "Новая школа", "work_title": "Новое название", "group_0_who": "ученик",
+                  "group_0_name": "Иванов И. И.", "supervisor_position": "учитель",
+                  "supervisor_name": "Смирнова А. А.", "city": "Москва", "year": "2026",
+                  "profile_file": "01_inzhenery_budushchego.json"},
+        )
+        data = {"document": (self.make_work_with_title(), "work.docx"),
+                "profile_file": "01_inzhenery_budushchego.json", "title_file": response.get_json()["file"]}
+        data.update(extra)
+        return self.client.post("/apply", data=data, content_type="multipart/form-data").get_json()
+
+    def test_second_title_page_asks_and_can_replace_old(self):
+        self.assertTrue(self.apply_with_new_title({})["two_titles"])
+
+        replaced = self.apply_with_new_title({"title_mode": "replace"})
+        texts = [p.text for p in Document(os.path.join(OUTPUTS_FOLDER, output_file(replaced["url"]))).paragraphs]
+        self.assertIn("НОВОЕ НАЗВАНИЕ", texts)
+        self.assertNotIn("СТАРОЕ НАЗВАНИЕ", texts)
+
+        kept = self.apply_with_new_title({"title_mode": "keep"})
+        texts = [p.text for p in Document(os.path.join(OUTPUTS_FOLDER, output_file(kept["url"]))).paragraphs]
+        self.assertIn("СТАРОЕ НАЗВАНИЕ", texts)
+        self.assertTrue(kept["warnings"][0].startswith("В документе два титульных листа"))
+
+    def test_theses_type_uses_thesis_size_and_spacing(self):
+        with tempfile.TemporaryDirectory() as folder:
+            source = os.path.join(folder, "theses.docx")
+            result = os.path.join(folder, "out.docx")
+            document = Document()
+            document.add_paragraph("Текст тезисов. " * 20)
+            document.save(source)
+            check_and_format_document(
+                source, os.path.join(PROFILES_FOLDER, "01_inzhenery_budushchego.json"), result, None, "theses")
+            p = Document(result).paragraphs[0]
+        self.assertEqual(p.runs[0].font.size.pt, 12)
+        self.assertEqual(p.paragraph_format.line_spacing, 1.0)
+
+    def test_punctuation_keeps_relative_paths(self):
+        from punctuation import find_edits
+
+        edits, _ = find_edits("Нельзя передать путь вроде ../../другой_файл.", False, True, None)
+        self.assertEqual(edits, [])
 
 
 if __name__ == "__main__":

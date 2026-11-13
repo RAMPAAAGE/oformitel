@@ -7,11 +7,11 @@ from checks import (
 )
 from fixes import (
     add_captions, add_table_captions, apply_alignment, apply_paragraph_spaces, remove_decoration, apply_font, apply_indent, apply_margins, apply_size, apply_spacing,
-    fix_numbers, fix_themes, fix_toc, format_title, insert_title_page,
+    fix_numbers, fix_themes, fix_toc, format_title, insert_title_page, remove_title_page,
 )
 from layout import analyze_layout
 from profiles import (  # noqa: F401 (их берёт app.py)
-    DOCUMENT_TYPES, create_profile, list_profiles, load_profile, update_profile,
+    DOCUMENT_TYPES, create_profile, list_profiles, load_profile, profile_for_type, update_profile,
 )
 from word_helpers import check_file_size, validate_docx_file  # noqa: F401 (их берёт app.py)
 
@@ -91,13 +91,11 @@ def fix_document(doc, profile, failed):
         format_title(doc, profile)  # после смены шрифта и интервалов титульный лист оформляем отдельно
 
 
-def check_and_format_document(input_path, profile_path, output_path, title_path=None, document_type=None):
+def check_and_format_document(input_path, profile_path, output_path, title_path=None, document_type=None,
+                              title_mode="keep"):
+    # title_mode: что делать со старым титульным листом, если вставляем новый - "replace" (удалить) или "keep"
     validate_docx_file(input_path)
-    profile = load_profile(profile_path)
-    if document_type in DOCUMENT_TYPES:
-        # тип работы выбран в программе: обязательные разделы берём по нему, а не из профиля
-        profile["document_type"] = document_type
-        profile["structure"] = DOCUMENT_TYPES[document_type]
+    profile = profile_for_type(load_profile(profile_path), document_type)
 
     doc = Document(input_path)
     failed = check_document(doc, profile)
@@ -124,6 +122,8 @@ def check_and_format_document(input_path, profile_path, output_path, title_path=
         # пока старый титульный лист ещё виден программе как титульный
         changes = punct_work(doc, analyze_layout(doc), apply=True)
     if title_path:
+        if had_title and title_mode == "replace":
+            remove_title_page(doc)
         insert_title_page(doc, title_path)
         # после вставки структура документа изменилась - проверяем заново
         for number in check_document(doc, profile):
@@ -135,8 +135,9 @@ def check_and_format_document(input_path, profile_path, output_path, title_path=
     doc.save(output_path)
 
     warnings = find_warnings(doc) + structure_warnings(doc, profile)
-    if title_path and had_title:
-        warnings.insert(0, "В документе уже был свой титульный лист — теперь их два. Удалите лишний.")
+    if title_path and had_title and title_mode != "replace":
+        warnings.insert(0, "В документе два титульных листа: новый (первая страница) и старый (вторая). "
+                           "Лишний удалите в Word или оформите работу заново и выберите «Заменить старый».")
     return {
         "is_correct": False,
         "profile_name": profile.get("name", ""),

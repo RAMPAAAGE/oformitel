@@ -15,7 +15,7 @@ from checks import (
 from layout import all_paragraphs, analyze_layout, get_role
 from word_helpers import (
     get_bold, get_runs, get_size, get_sect, has_picture, has_sect, page_breaks, prev_par, section_number,
-    split_dots, split_space_page, validate_docx_file,
+    set_font_xml, split_dots, split_space_page, validate_docx_file,
 )
 
 
@@ -34,17 +34,21 @@ def apply_margins(doc, profile):
 
 
 def apply_font(doc, profile):
-    # сначала меняем шрифт в стилях (заголовки берут шрифт из стиля), потом в самом тексте
+    # сначала шрифт по умолчанию и в стилях (заголовки берут шрифт из стиля), потом в самом тексте
+    font = profile["font_name"]
+    defaults = doc.styles.element.find(qn("w:docDefaults"))
+    if defaults is not None and defaults.find(qn("w:rPrDefault")) is not None:
+        rpr_default = defaults.find(qn("w:rPrDefault"))
+        if rpr_default.find(qn("w:rPr")) is None:
+            rpr_default.append(OxmlElement("w:rPr"))
+        set_font_xml(rpr_default.find(qn("w:rPr")), font)
     for style in doc.styles:
-        if style.type == WD_STYLE_TYPE.PARAGRAPH:
-            style.font.name = profile["font_name"]
-            # "шрифт темы" перебивает обычный шрифт, поэтому его убираем
-            for attribute in ["w:asciiTheme", "w:hAnsiTheme", "w:eastAsiaTheme", "w:cstheme"]:
-                style.element.rPr.rFonts.attrib.pop(qn(attribute), None)
+        if style.type in (WD_STYLE_TYPE.PARAGRAPH, WD_STYLE_TYPE.CHARACTER, WD_STYLE_TYPE.TABLE):
+            set_font_xml(style.element.get_or_add_rPr(), font)
     layout = analyze_layout(doc)
     for p in all_paragraphs(doc, layout, True):
         for run in get_runs(p):
-            run.font.name = profile["font_name"]
+            set_font_xml(run._r.get_or_add_rPr(), font)
 
 
 def apply_size(doc, profile):
@@ -382,6 +386,21 @@ def format_title(doc, profile):
             set_run_style(p, False, size)
         else:
             set_run_style(p, None, size)
+
+
+def remove_title_page(doc):
+    # удаляем всё от начала документа до последней строки старого титульного листа
+    # (вместе с таблицами и картинками на нём)
+    title = analyze_layout(doc)["title"]
+    if not title:
+        return
+    last = title[-1]._p
+    body = doc.element.body
+    while len(body) > 1:
+        element = body[0]
+        body.remove(element)
+        if element is last:
+            break
 
 
 def insert_title_page(doc, title_path):

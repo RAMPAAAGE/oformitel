@@ -1,7 +1,9 @@
 import os
 
 from docx.enum.dml import MSO_THEME_COLOR
+from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from docx.oxml.ns import qn
+from lxml import etree
 from docx.shared import RGBColor
 from docx.text.run import Run
 
@@ -215,11 +217,80 @@ def from_style(p, get_value):
     return None
 
 
-def get_font(run, p):
+THEME_ATTRIBUTES = ["w:asciiTheme", "w:hAnsiTheme", "w:eastAsiaTheme", "w:cstheme"]
+
+
+def theme_font(part, theme_name):
+    # theme_name - "majorHAnsi" (шрифт заголовков темы, обычно Calibri Light) или "minorHAnsi" (шрифт текста)
     try:
-        return run.font.name or from_style(p, lambda style: style.font.name)
-    except (ValueError, TypeError):
+        theme = etree.fromstring(part.part_related_by(RT.THEME).blob)
+    except (KeyError, AttributeError, etree.XMLSyntaxError):
+        return "шрифт темы"
+    kind = "a:majorFont" if theme_name.startswith("major") else "a:minorFont"
+    latin = theme.find(".//" + qn(kind) + "/" + qn("a:latin"))
+    if latin is None:
+        return "шрифт темы"
+    return latin.get("typeface")
+
+
+def font_in(rpr, part):
+    # Шрифт из <w:rPr> текста или стиля. Если указан «шрифт темы», Word берёт его,
+    # даже когда рядом записан обычный шрифт - поэтому сначала смотрим тему
+    if rpr is None:
         return None
+    fonts = rpr.find(qn("w:rFonts"))
+    if fonts is None:
+        return None
+    for name in ["w:hAnsiTheme", "w:asciiTheme"]:
+        if fonts.get(qn(name)):
+            return theme_font(part, fonts.get(qn(name)))
+    return fonts.get(qn("w:hAnsi")) or fonts.get(qn("w:ascii"))
+
+
+def styles_chain(style):
+    result = []
+    while style is not None:
+        result.append(style)
+        style = style.base_style
+    return result
+
+
+def default_rpr(part):
+    # настройки текста «по умолчанию» для всего документа (w:docDefaults)
+    try:
+        defaults = part.styles.element.find(qn("w:docDefaults"))
+    except AttributeError:
+        return None
+    if defaults is None or defaults.find(qn("w:rPrDefault")) is None:
+        return None
+    return defaults.find(qn("w:rPrDefault")).find(qn("w:rPr"))
+
+
+def get_font(run, p):
+    # Как Word: шрифт у самого текста, потом в стиле текста, потом в стиле абзаца, потом по умолчанию
+    try:
+        part = p.part
+        places = [run._r.rPr]
+        if run.style is not None:
+            places += [style.element.rPr for style in styles_chain(run.style)]
+        places += [style.element.rPr for style in styles_chain(p.style)]
+        places.append(default_rpr(part))
+        for rpr in places:
+            font = font_in(rpr, part)
+            if font:
+                return font
+    except (ValueError, TypeError, AttributeError):
+        return None
+    return None
+
+
+def set_font_xml(rpr, font_name):
+    # обычный шрифт для всех видов букв, а «шрифт темы» убираем, иначе он перебьёт обычный
+    fonts = rpr.get_or_add_rFonts()
+    for name in ["w:ascii", "w:hAnsi", "w:eastAsia", "w:cs"]:
+        fonts.set(qn(name), font_name)
+    for name in THEME_ATTRIBUTES:
+        fonts.attrib.pop(qn(name), None)
 
 
 def get_size(run, p):
